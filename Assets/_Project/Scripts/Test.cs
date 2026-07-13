@@ -6,54 +6,68 @@ public class Test : MonoBehaviour
 {
     private void Start()
     {
-        Person p = new Person();
-        p.age = 10;
-        p.name = "Test";
-        p.height = 3.14f;
-        p.sex = true;
-        byte[] bytes = p.SerializeMe();
+        Person p = new Person(88, new Dog("旺财", 2), "老炮", 3.14f, true);
+        byte[] pBytes = p.GetAllFieldBytes();
     }
 }
 
 
-public class Person
+public class Person : CanBinarySerialize
 {
     public int age;
+    public Dog dog;
     public string name;
     public float height;
     public bool sex;
 
-    public byte[] SerializeMe()
+    public Person(int age, Dog dog, string name, float height, bool sex)
     {
-        //如果不用linq去拼接数组，那么的话就需要一开始就要定好数组的长度，否则到后面不好copy
-        int finallyBytesCount = 0;
-        finallyBytesCount += sizeof(int); //age的字节数组长度
-        finallyBytesCount += sizeof(int); //记录name的字节数组长度的字节数组长度
-        finallyBytesCount += Encoding.UTF8.GetBytes(name).Length; // name字节数组的长度
-        finallyBytesCount += sizeof(float); //height的字节数组长度
-        finallyBytesCount += sizeof(bool); //sex的字节数组长度
-        //到这一步为止就得到了最终二进制序列化信息的那个字节数组的长度了，然后再得到这些成员变量的字节数组
-        byte[] ageBytes = BitConverter.GetBytes(age);
-        byte[] nameBytes = Encoding.UTF8.GetBytes(name);
-        byte[] nameBytesCountBytes = BitConverter.GetBytes(nameBytes.Length);
-        byte[] heightBytes = BitConverter.GetBytes(height);
-        byte[] sexBytes = BitConverter.GetBytes(sex);
-        //然后把这些数组都填入到最终的数组中，首先先创建一个最终的数组，长度就是刚才得到的长度
-        byte[] finallyBytes = new byte[finallyBytesCount];
-        int bytesIndex = 0;
-        ageBytes.CopyTo(finallyBytes, bytesIndex);
-        bytesIndex += sizeof(int);
+        this.age = age;
+        this.dog = dog;
+        this.name = name;
+        this.height = height;
+        this.sex = sex;
+    }
 
-        nameBytesCountBytes.CopyTo(finallyBytes, bytesIndex);
-        bytesIndex += sizeof(int);
+    public override int GetAllFieldBytesLength()
+    {
+        int dogBytesCount = dog.GetAllFieldBytesLength();
+        int stringBytesCount = GetStringFieldAllCount(name);
+        int allCount = sizeof(int) + dogBytesCount + stringBytesCount + sizeof(float) + sizeof(bool);
+        return allCount;
+    }
 
-        nameBytes.CopyTo(finallyBytes, bytesIndex);
-        bytesIndex += Encoding.UTF8.GetBytes(name).Length;
+    protected override void WriteInAllFieldBytes()
+    {
+        WriteIntFieldToAllFieldBytes(age);
+        WriteCustomFieldToAllFieldBytes(dog);
+        WriteStringFieldToAllFieldBytes(name);
+        WriteFloatFieldToAllFieldBytes(height);
+        WriteBoolFieldToAllFieldBytes(sex);
+    }
+}
 
-        heightBytes.CopyTo(finallyBytes, bytesIndex);
-        bytesIndex += sizeof(float);
-        sexBytes.CopyTo(finallyBytes, bytesIndex);
-        
-        return finallyBytes;
+public class Dog : CanBinarySerialize
+{
+    public string name;
+    public int age;
+
+    public Dog(string name, int age)
+    {
+        this.name = name;
+        this.age = age;
+    }
+
+    public override int GetAllFieldBytesLength()
+    {
+        int nameBytesAllCount = GetStringFieldAllCount(name);
+        int allCount = nameBytesAllCount + sizeof(int);
+        return allCount;
+    }
+
+    protected override void WriteInAllFieldBytes()
+    {
+        WriteStringFieldToAllFieldBytes(name);
+        WriteIntFieldToAllFieldBytes(age);
     }
 }
