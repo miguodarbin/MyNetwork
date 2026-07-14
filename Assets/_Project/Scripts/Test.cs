@@ -8,6 +8,7 @@ public class Test : MonoBehaviour
     {
         Person p = new Person(88, new Dog("旺财", 2), "老炮", 3.14f, true);
         byte[] pBytes = p.GetAllFieldBytes();
+        
     }
 }
 
