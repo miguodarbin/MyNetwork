@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
-public abstract class CanBinarySerializeBase
+public abstract class CanBeBinarySerializeBase
 {
 }
 
@@ -12,7 +12,7 @@ public abstract class CanBinarySerializeBase
 /// 需要被二进制序列化的必须要继承此类，如果序列化的字段里面有自定义类型，那个自定义类型也需要继承此类,注意，string和自定义类型的话的都会写入字节长度的头信息
 /// </summary>
 /// <typeparam name="T">子类的类型</typeparam>
-public abstract class CanBinarySerialize<T> : CanBinarySerializeBase where T : CanBinarySerialize<T>, new()
+public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T : CanBeBinarySerialize<T>, new()
 {
     //==================================================字段属性==================================================
     //内部来维护这个子类型的 总字段字节数组
@@ -104,7 +104,7 @@ public abstract class CanBinarySerialize<T> : CanBinarySerializeBase where T : C
     /// </summary>
     /// <param name="value">自定义类型对象</param>
     /// <typeparam name="TK">自定义类型对象的类型</typeparam>
-    protected void WriteCustomFieldToAllFieldBytes<TK>(TK value) where TK : CanBinarySerialize<TK>, new()
+    protected void WriteCustomFieldToAllFieldBytes<TK>(TK value) where TK : CanBeBinarySerialize<TK>, new()
     {
         byte[] valueBytes = value.SerializeToBytes();
         int valueBytesCount = valueBytes.Length;
@@ -123,7 +123,7 @@ public abstract class CanBinarySerialize<T> : CanBinarySerializeBase where T : C
         return valueBytesCount + sizeof(int);
     }
 
-    protected int GetCustomFieldAllCount<TK>(TK value) where TK : CanBinarySerialize<TK>, new()
+    protected int GetCustomFieldAllCount<TK>(TK value) where TK : CanBeBinarySerialize<TK>, new()
     {
         return sizeof(int) + value.GetAllFieldBytesLength();
     }
@@ -158,7 +158,7 @@ public abstract class CanBinarySerialize<T> : CanBinarySerializeBase where T : C
         return value;
     }
 
-    protected TK ReadAllFieldBytesToCustomField<TK>() where TK : CanBinarySerialize<TK>, new()
+    protected TK ReadAllFieldBytesToCustomField<TK>() where TK : CanBeBinarySerialize<TK>, new()
     {
         int fieldBytesLength = ReadAllFieldBytesToIntField();
         byte[] fieldBytes = new byte[fieldBytesLength];

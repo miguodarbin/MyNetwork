@@ -81,9 +81,9 @@ public class NetworkManager : MonoBehaviour
     }
 
     //发消息,单独用一个异步方法，把发消息作为一个Task单独去让线程池去做
-    public void SendBytesToServer(string msg)
+    public void SendBytesToServer(byte[] bytes)
     {
-        _pendingSendBytesQueue.Enqueue(System.Text.Encoding.UTF8.GetBytes(msg));
+        _pendingSendBytesQueue.Enqueue(bytes);
     }
 
     //作为从_pendingSendQueue取出来的字节数组容器
@@ -116,7 +116,7 @@ public class NetworkManager : MonoBehaviour
     }
 
     //声明一个容器，作为专门去操作系统那边的的Socket收消息缓冲区里面捞字节的水桶
-    private byte[] bytesBucket = new byte[1024];
+    private byte[] bytesBucket = new byte[1024 * 1024];
 
     //专门处理接受消息的异步方法，处理逻辑作为Task交给线程池，然后就会把执行权返回给调用者
     private async void ProgressReceivedBytesAsync()
@@ -179,7 +179,7 @@ public class NetworkManager : MonoBehaviour
         _pendingSendBytesQueue.Clear();
         _receivedBytesQueue.Clear();
     }
-    
+
     private void OnDestroy()
     {
         if (Instance == this)

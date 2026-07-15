@@ -21,7 +21,7 @@ public class Test : MonoBehaviour
 }
 
 
-public class Person : CanBinarySerialize<Person>
+public class Person : CanBeBinarySerialize<Person>
 {
     public int age;
     public Dog dog;
@@ -69,7 +69,7 @@ public class Person : CanBinarySerialize<Person>
     }
 }
 
-public class Dog : CanBinarySerialize<Dog>
+public class Dog : CanBeBinarySerialize<Dog>
 {
     public string name;
     public int age;

@@ -22,7 +22,11 @@ public class TestNetwork : MonoBehaviour
 
     private void OnButtonClick()
     {
-        NetworkManager.Instance.SendBytesToServer(inputField.text);
+        //向服务器发送string
+        //NetworkManager.Instance.SendBytesToServer(Encoding.UTF8.GetBytes(inputField.text));
+        //向服务器发送自定义消息类型
+        PlayerMsg playerMsg = new PlayerMsg(1, new PlayerData("老炮", 99.8f, 18, true));
+        NetworkManager.Instance.SendBytesToServer(playerMsg.SerializeToBytes());
     }
 
     void Update()
