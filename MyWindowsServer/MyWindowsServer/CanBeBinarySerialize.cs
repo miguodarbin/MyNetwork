@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
-using UnityEngine;
+
 
 public abstract class CanBeBinarySerializeBase
 {
@@ -15,10 +15,10 @@ public abstract class CanBeBinarySerializeBase
 public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T : CanBeBinarySerialize<T>, new()
 {
     //==================================================字段属性==================================================
-    //内部来维护这个子类型的 总字节数组
+    //内部来维护这个子类型的 总字段字节数组
     protected byte[] allBytes;
 
-    //用来记录当前已经写到总字节数组的哪里了？
+    //用来记录当前已经写到总字段字节数组的哪里了？
     private int _bytesReadOrWritePosition = 0;
 
 
@@ -153,8 +153,6 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
     protected string ReadAllBytesToStringType()
     {
         int stringBytesLength = ReadAllBytesToIntType();
-
-        
         string value = Encoding.UTF8.GetString(allBytes, _bytesReadOrWritePosition, stringBytesLength);
         _bytesReadOrWritePosition += stringBytesLength;
         return value;

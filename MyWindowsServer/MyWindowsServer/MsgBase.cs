@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using UnityEngine;
+
 
 /// <summary>
 /// 继承MsgBase类的，完成GetAllFieldBytesLength、 WriteInAllFieldBytes、ReadFromAllFieldBytes时也要考虑MsgTypeID！！！把Msg的读写都放在最开头！！！

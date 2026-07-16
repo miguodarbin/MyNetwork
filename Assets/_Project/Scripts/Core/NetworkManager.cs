@@ -42,8 +42,11 @@ public class NetworkManager : MonoBehaviour
     //专门开一个队列，记录待发送的。然后有一个专门处理这个队列发送的异步方法，不会阻塞主线程
     private Queue<Byte[]> _pendingSendBytesQueue = new Queue<Byte[]>();
 
-    //再专门开一个队列，专门用来记录自己从服务器那边收过来的消息
-    private Queue<byte[]> _receivedBytesQueue = new Queue<byte[]>();
+    //处理完分包粘包的字节数组区Queue<byte[]>：被 ProcessTCPStream 处理过的字节数组才往里面放，一个字节数组代表一个完整消息。由外部取消费这个Queue<byte>消息
+    private Queue<byte[]> _processedMsgQueue = new Queue<byte[]>();
+
+    //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
+    private Queue<byte> _originalBytesQueue = new Queue<byte>();
 
     //声明一个开关，记录是否要这个Manager的连接到服务器
     private bool _needConnectToServer = false;
@@ -116,7 +119,7 @@ public class NetworkManager : MonoBehaviour
     }
 
     //声明一个容器，作为专门去操作系统那边的的Socket收消息缓冲区里面捞字节的水桶
-    private byte[] bytesBucket = new byte[1024 * 1024];
+    private byte[] originalBytesBucket = new byte[1024 * 1024];
 
     //专门处理接受消息的异步方法，处理逻辑作为Task交给线程池，然后就会把执行权返回给调用者
     private async void ProgressReceivedBytesAsync()
@@ -127,14 +130,20 @@ public class NetworkManager : MonoBehaviour
             {
                 try
                 {
-                    int bytesCount = _clientSocket.Receive(bytesBucket);
+                    int bytesCount = _clientSocket.Receive(originalBytesBucket);
                     if (bytesCount == 0)
                     {
                         _needConnectToServer = false;
                         break;
                     }
 
-                    _receivedBytesQueue.Enqueue(bytesBucket[..bytesCount]);
+                    for (int i = 0; i < bytesCount; i++)
+                    {
+                        _originalBytesQueue.Enqueue(originalBytesBucket[i]);
+                    }
+
+                    //不断的接收客户端的发来的字节，然后放到缓存区里。只要一有内容放到缓存区就调用ProcessTCPOriginalBytes()
+                    ProcessTCPOriginalBytes();
                 }
                 catch (SocketException e)
                 {
@@ -146,10 +155,80 @@ public class NetworkManager : MonoBehaviour
         });
     }
 
-    //暴露给外部一个从收消息的队列里看有没有东西的方法
-    public bool IsHaveServerSendBytes()
+    //这个方法应该不需要开异步方法，感觉并不耗时，因为和网络好坏也没关系，算法循环次数也多不了几次
+    private void ProcessTCPOriginalBytes()
     {
-        if (_receivedBytesQueue.Count > 0)
+        //循环判断：缓存区有字节就进入循环，无字节就退出循环。还有靠break打破循环
+        while (_originalBytesQueue.Count > 0)
+        {
+            //游标：处理到缓存区的哪里了？
+            int cursor = 0;
+            //消息头长度：基本上就是两个int就是8个字节
+            int headCount = 8;
+            //缓存区目前里面的长度
+            int originalBytesListCount = _originalBytesQueue.Count;
+            //如果缓存区的字节长度大于等于消息头的长度,那就说明可以继续解析消息头的具体内容
+            if (originalBytesListCount >= headCount)
+            {
+                //游标 +4，从消息体长度开始读
+                cursor += sizeof(int);
+                int msgBodyCount = BitConverter.ToInt32(_originalBytesQueue.ToArray(), cursor);
+                //游标再 +4，指向消息体
+                cursor += sizeof(int);
+                //拿缓存区的总个数-目前游标位置得到  缓存区剩余的字节数,也就是消息体的字节数
+                int remainBytesCount = originalBytesListCount - cursor;
+                //游标再 +消息体长度，指向下一个消息头部
+                cursor += msgBodyCount;
+                //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数大于消息体长度，说明粘包了。
+                if (remainBytesCount > msgBodyCount)
+                {
+                    //然后把从0到对象字节长度那么多的字节从缓存区拿走，加入成功区。
+                    byte[] msgBytes = new byte[cursor];
+                    for (int i = 0; i < cursor; i++)
+                    {
+                        msgBytes[i] = _originalBytesQueue.Dequeue();
+                    }
+
+                    _processedMsgQueue.Enqueue(msgBytes);
+
+                    //游标置零，让下一次循环时，游标指向消息头。否则游标一直是旧值，而Queue队列不断变化，会无法对齐。不用打破循环，一直走到打破循环的分支上去。
+                    cursor = 0;
+                }
+
+                //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数等于消息体长度，说明没有发生粘包分包。
+                if (remainBytesCount == msgBodyCount)
+                {
+                    //然后把从0到对象字节长度那么多的字节从缓存区拿走，加入成功区。
+                    byte[] msgBytes = new byte[cursor];
+                    for (int i = 0; i < cursor; i++)
+                    {
+                        msgBytes[i] = _originalBytesQueue.Dequeue();
+                    }
+
+                    _processedMsgQueue.Enqueue(msgBytes);
+
+                    //打破循环，因为缓存区再拿完这条消息之后就没字节了。
+                    break;
+                }
+
+                //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数小于消息体长度，说明发生分包了。
+                if (remainBytesCount < msgBodyCount)
+                {
+                    //此时不应该继续处理了，直接打破循环，等之后的再发消息过来，再来判断能不能处理。
+                    break;
+                }
+            }
+            else //如果缓存区的字节长度小于消息头的长度,也不进行处理，直接打破循环，等之后的再发消息过来，再来判断能不能处理。
+            {
+                break;
+            }
+        }
+    }
+
+    //暴露给外部一个从收消息的队列里看有没有东西的方法
+    public bool IsHaveServerSendMsg()
+    {
+        if (_processedMsgQueue.Count > 0)
         {
             return true;
         }
@@ -159,12 +238,14 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    //暴露给外部一个从收消息的队列里拿东西的方法
-    public byte[] GetServerSendBytes()
+    /// <summary>
+    /// 暴露给外部一个从收消息的队列里拿东西的方法,只要能拿到，就说明消息一定是完整的，一定是经过分包黏包处理过的
+    /// </summary>
+    public byte[] GetServerSendMsg()
     {
-        if (IsHaveServerSendBytes())
+        if (IsHaveServerSendMsg())
         {
-            return _receivedBytesQueue.Dequeue();
+            return _processedMsgQueue.Dequeue();
         }
 
         return null;
@@ -177,7 +258,7 @@ public class NetworkManager : MonoBehaviour
         _clientSocket.Shutdown(SocketShutdown.Both);
         _clientSocket.Close();
         _pendingSendBytesQueue.Clear();
-        _receivedBytesQueue.Clear();
+        _processedMsgQueue.Clear();
     }
 
     private void OnDestroy()
