@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -21,7 +22,7 @@ public class TestNetwork : MonoBehaviour
         sendCustomTypeButton.onClick.AddListener(OnSendCustomTypeButtonClick);
         sendFenBaoButton.onClick.AddListener(OnSendFenBaoButtonClick);
         sendNianBaoButton.onClick.AddListener(OnSendNianBaoButtonClick);
-        sendNianBaoButton.onClick.AddListener(OnSendFenBaoNianBaoButtonClick);
+        sendFenBaoNianBaoButton.onClick.AddListener(OnSendFenBaoNianBaoButtonClick);
     }
 
     private void OnDisable()
@@ -36,7 +37,8 @@ public class TestNetwork : MonoBehaviour
     private void OnStringButtonClick()
     {
         //向服务器发送string
-        NetworkManager.Instance.SendBytesToServer(Encoding.UTF8.GetBytes(inputField.text));
+        StringMsg stringMsg = new StringMsg(inputField.text);
+        NetworkManager.Instance.SendBytesToServer(stringMsg.SerializeToBytes());
     }
 
     private void OnSendCustomTypeButtonClick()
@@ -53,7 +55,10 @@ public class TestNetwork : MonoBehaviour
 
     private void OnSendNianBaoButtonClick()
     {
-        Debug.Log("Send NianBao");
+        StringMsg msg = new StringMsg("黏包的String");
+        StringMsg msg2 = new StringMsg("NianBaoのString");
+        byte[] nianBaoBytes = msg.SerializeToBytes().Concat(msg2.SerializeToBytes()).ToArray();
+        NetworkManager.Instance.SendBytesToServer(nianBaoBytes);
     }
 
     private void OnSendFenBaoNianBaoButtonClick()
@@ -66,11 +71,20 @@ public class TestNetwork : MonoBehaviour
         //接收消息
         if (NetworkManager.Instance.IsHaveServerSendBytes())
         {
+            //将字节取出来。
             byte[] bytes = NetworkManager.Instance.GetServerSendBytes();
+            //目前字节有这些情况:
+            
+            
             int MsgType = BitConverter.ToInt32(bytes, 0);
-            Debug.Log(MsgType);
             switch (MsgType)
             {
+                case 1000:
+                    StringMsg stringMsg = new StringMsg();
+                    stringMsg.DeSerializeFormBytes(bytes);
+                    Debug.Log(stringMsg.msg);
+                    break;
+
                 case 1001:
                     PlayerMsg playerMsg = new PlayerMsg();
                     playerMsg.DeSerializeFormBytes(bytes);

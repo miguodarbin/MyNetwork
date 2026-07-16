@@ -18,27 +18,32 @@ public class PlayerMsg : MsgBase<PlayerMsg>
     }
 
 
-    public override int GetAllFieldBytesLength()
+    public override int GetAllBytesLength()
     {
-        return GetMsgTypeIDCount() + sizeof(int) + GetCustomFieldAllCount(playerData);
+        return GetMsgHeaderCount() + sizeof(int) + GetCustomTypeAllCount(playerData);
     }
 
     protected override void WriteInAllFieldBytes()
     {
-        WriteMsgTypeIDToAllFieldBytes();
-        WriteIntFieldToAllFieldBytes(playerId);
-        WriteCustomFieldToAllFieldBytes(playerData);
+        WriteMsgHeaderToAllFieldBytes();
+        WriteIntTypeToAllBytes(playerId);
+        WriteCustomTypeToAllBytes(playerData);
     }
 
-    protected override void ReadFromAllFieldBytes()
+    protected override void ReadFromAllBytes()
     {
-        ReadAllFieldBytesToMsgTypeID();
-        playerId = ReadAllFieldBytesToIntField();
-        playerData = ReadAllFieldBytesToCustomField<PlayerData>();
+        ReadAllFieldBytesToMsgHeader();
+        playerId = ReadAllBytesToIntType();
+        playerData = ReadAllBytesToCustomType<PlayerData>();
     }
 
     protected override void SetMsgTypeID()
     {
         MsgTypeID = 1001;
+    }
+
+    protected override void SetMsgBodyCount()
+    {
+        throw new System.NotImplementedException();
     }
 }
