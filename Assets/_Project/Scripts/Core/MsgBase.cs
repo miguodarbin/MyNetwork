@@ -17,7 +17,7 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
         set { msgTypeID = value; }
     }
 
-    protected abstract void SetTypeID();
+    protected abstract void SetMsgTypeID();
 
     //==================================================提供给子类的方法==================================================
     /// <summary>
@@ -48,7 +48,7 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
     {
         if (msgTypeID == -999999999)
         {
-            SetTypeID();
+            SetMsgTypeID();
         }
     }
 }

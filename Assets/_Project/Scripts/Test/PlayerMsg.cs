@@ -37,7 +37,7 @@ public class PlayerMsg : MsgBase<PlayerMsg>
         playerData = ReadAllFieldBytesToCustomField<PlayerData>();
     }
 
-    protected override void SetTypeID()
+    protected override void SetMsgTypeID()
     {
         MsgTypeID = 1001;
     }
