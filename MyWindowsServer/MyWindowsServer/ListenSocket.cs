@@ -10,8 +10,13 @@ namespace MyWindowsServer;
 /// </summary>
 public class ListenSocket
 {
+    //开启一个监听客户端的Socket，客户端的Socket不和这个监听Socket连接，只作为监听用
     private Socket _listenSocket;
+
+    //这个监听Socket同时维护自己监听到的客户端通信Socket
     private Dictionary<int, ConnectClientSocket> _connectClientSocketDict = new Dictionary<int, ConnectClientSocket>();
+
+    //是否启用这个监听Socket，比如一直去监听有没有客户端接入、一直接收客户端消息
     private bool _isEnable = false;
 
     /// <summary>
@@ -120,9 +125,9 @@ public class ListenSocket
 
     public void BroadcastToAllClients(byte[] bytes)
     {
-        foreach (var item in _connectClientSocketDict)
+        foreach (var connectClientSocket in _connectClientSocketDict.Values)
         {
-            item.Value.SendBytesToClient(bytes);
+            connectClientSocket.SendBytesToClient(bytes);
         }
     }
 }

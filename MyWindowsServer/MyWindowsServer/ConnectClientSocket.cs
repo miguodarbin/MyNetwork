@@ -25,8 +25,16 @@ public class ConnectClientSocket
         this.ID = ++IDCreator;
     }
 
+    //=========================================接收远程客户端frame=========================================
+
     //先搞一个水桶，方便去系统那边捞传输过来的字节
     byte[] buffer = new byte[1024 * 1024];
+
+    //处理完分包粘包的字节数组区Queue<byte[]>：被 ProcessTCPStream 处理过的字节数组才往里面放，一个字节数组代表一个完整消息。由外部取消费这个Queue<byte>消息
+    private Queue<byte[]> _processedMsgQueue = new Queue<byte[]>();
+
+    //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
+    private Queue<byte> _originalBytesQueue = new Queue<byte>();
 
 
     /// <summary>
@@ -65,13 +73,7 @@ public class ConnectClientSocket
         }
     }
 
-
-    //处理完分包粘包的字节数组区Queue<byte[]>：被 ProcessTCPStream 处理过的字节数组才往里面放，一个字节数组代表一个完整消息。由外部取消费这个Queue<byte>消息
-    private Queue<byte[]> _processedMsgQueue = new Queue<byte[]>();
-
-    //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
-    private Queue<byte> _originalBytesQueue = new Queue<byte>();
-
+    //这个方法主要是用来处理分包黏包，处理完之后交给ProgressReceivedMsg分析器去分析frame
     private void ProcessTCPOriginalBytes()
     {
         //循环判断：缓存区有字节就进入循环，无字节就退出循环。还有靠break打破循环
@@ -173,6 +175,8 @@ public class ConnectClientSocket
         });
     }
 
+
+    //=========================================发送本地服务器frame=========================================
     public void SendBytesToClient(byte[] bytes)
     {
         if (_connectClientSocket == null)
@@ -182,7 +186,7 @@ public class ConnectClientSocket
 
         try
         {
-            _connectClientSocket.Send(bytes);
+            SendCompleteFrame(bytes);
         }
         catch (SocketException e)
         {
@@ -191,6 +195,35 @@ public class ConnectClientSocket
             Console.WriteLine(e.Message);
         }
     }
+
+
+    // 由于Send方法可能一次不会把传给他的frame都发出去，所以需要持续发送，直到一整个完整帧全部发送完成。
+    private void SendCompleteFrame(byte[] frameBytes)
+    {
+        int offset = 0;
+
+        while (offset < frameBytes.Length)
+        {
+            int remainingLength = frameBytes.Length - offset;
+
+            int sentCount = _connectClientSocket.Send(
+                frameBytes,
+                offset,
+                remainingLength,
+                SocketFlags.None
+            );
+
+            //服务端无法继续发送时，关闭当前客户端会话
+            if (sentCount <= 0)
+            {
+                Close();
+                return;
+            }
+
+            offset += sentCount;
+        }
+    }
+
 
     /// <summary>
     /// 获得这个ConnectClientSocket的所连接的那个客户端的IP端口号

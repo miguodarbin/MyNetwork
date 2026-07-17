@@ -7,7 +7,7 @@ using UnityEngine;
 
 public class NetworkManager : MonoBehaviour
 {
-    //单例
+    //TODO:之后把这个单例维护到XFramework的时候要接入框架的单例
     private static NetworkManager _instance;
 
     public static NetworkManager Instance
@@ -34,19 +34,11 @@ public class NetworkManager : MonoBehaviour
             Destroy(this.gameObject);
         }
     }
-    //============================================================
+    
+    //===============================================================================================
 
     //声明一个通信Socket，用来用TCP协议去找服务器通信
     private Socket _clientSocket;
-
-    //专门开一个队列，记录待发送的。然后有一个专门处理这个队列发送的异步方法，不会阻塞主线程
-    private Queue<Byte[]> _pendingSendBytesQueue = new Queue<Byte[]>();
-
-    //处理完分包粘包的字节数组区Queue<byte[]>：被 ProcessTCPStream 处理过的字节数组才往里面放，一个字节数组代表一个完整消息。由外部取消费这个Queue<byte>消息
-    private Queue<byte[]> _processedMsgQueue = new Queue<byte[]>();
-
-    //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
-    private Queue<byte> _originalBytesQueue = new Queue<byte>();
 
     //声明一个开关，记录是否要这个Manager的连接到服务器
     private bool _needConnectToServer = false;
@@ -83,14 +75,20 @@ public class NetworkManager : MonoBehaviour
         return true;
     }
 
-    //发消息,单独用一个异步方法，把发消息作为一个Task单独去让线程池去做
+    //===================================================接收远程服务器frame===================================
+
+    //专门开一个队列，记录待发送的。然后有一个专门处理这个队列发送的异步方法，不会阻塞主线程
+    private Queue<Byte[]> _pendingSendBytesQueue = new Queue<Byte[]>();
+
+
+    /// <summary>
+    /// 向客户端发送消息，内部是把消息排到一个队列里，然后靠ProgressSendBytesAsync异步处理发送消息
+    /// </summary>
+    /// <param name="bytes"></param>
     public void SendBytesToServer(byte[] bytes)
     {
         _pendingSendBytesQueue.Enqueue(bytes);
     }
-
-    //作为从_pendingSendQueue取出来的字节数组容器
-    private byte[] needSendBytesInQueue;
 
     //专门处理发送消息的异步方法，处理逻辑作为Task交给线程池，然后就会把执行权返回给调用者
     private async void ProgressSendBytesAsync()
@@ -101,10 +99,12 @@ public class NetworkManager : MonoBehaviour
                 {
                     if (_pendingSendBytesQueue.Count > 0)
                     {
-                        needSendBytesInQueue = _pendingSendBytesQueue.Dequeue();
+                        //从队列中取出一整个完整帧
+                        byte[] frameBytes = _pendingSendBytesQueue.Dequeue();
+
                         try
                         {
-                            _clientSocket.Send(needSendBytesInQueue);
+                            SendCompleteFrame(frameBytes);
                         }
                         catch (SocketException e)
                         {
@@ -117,6 +117,48 @@ public class NetworkManager : MonoBehaviour
             }
         );
     }
+    
+    // 由于Send方法可能一次不会把传给他的frame都发出去，所以需要持续发送，直到一整个完整帧全部发送完成。
+    private void SendCompleteFrame(byte[] frameBytes)
+    {
+        //offset 表示：前面已经成功发送了多少字节
+        int offset = 0;
+
+        //只要还有字节没发完，就继续发送
+        while (offset < frameBytes.Length)
+        {
+            //本次还剩多少字节需要发送
+            int remainingLength = frameBytes.Length - offset;
+
+            //从 offset 位置开始，尝试发送剩余的所有字节
+            int sentCount = _clientSocket.Send(
+                frameBytes,
+                offset,
+                remainingLength,
+                SocketFlags.None
+            );
+
+            //没有产生任何发送进度，连接已经不能继续正常发送
+            if (sentCount <= 0)
+            {
+                Debug.Log("发送消息失败");
+                _needConnectToServer = false;
+                return;
+            }
+
+            //根据本次实际发送量，推进已发送位置
+            offset += sentCount;
+        }
+    }
+
+
+    //===================================================发送本地客户端frame===================================
+
+    //处理完分包粘包的字节数组区Queue<byte[]>：被 ProcessTCPStream 处理过的字节数组才往里面放，一个字节数组代表一个完整消息。由外部取消费这个Queue<byte>消息
+    private Queue<byte[]> _processedMsgQueue = new Queue<byte[]>();
+
+    //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
+    private Queue<byte> _originalBytesQueue = new Queue<byte>();
 
     //声明一个容器，作为专门去操作系统那边的的Socket收消息缓冲区里面捞字节的水桶
     private byte[] originalBytesBucket = new byte[1024 * 1024];

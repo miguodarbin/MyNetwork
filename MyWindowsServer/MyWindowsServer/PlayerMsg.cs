@@ -43,6 +43,6 @@ public class PlayerMsg : MsgBase<PlayerMsg>
 
     protected override void SetMsgBodyCount()
     {
-        throw new System.NotImplementedException();
+        MsgBodyCount = sizeof(int) + GetCustomTypeAllCount(playerData);
     }
 }

@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 
 public class PlayerMsg : MsgBase<PlayerMsg>
 {
@@ -44,6 +43,6 @@ public class PlayerMsg : MsgBase<PlayerMsg>
 
     protected override void SetMsgBodyCount()
     {
-        throw new System.NotImplementedException();
+        MsgBodyCount = sizeof(int) + GetCustomTypeAllCount(playerData);
     }
 }

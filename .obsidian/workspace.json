@@ -1,0 +1,200 @@
+{
+  "main": {
+    "id": "f4aa6c2160a62e05",
+    "type": "split",
+    "children": [
+      {
+        "id": "11b80b5034ef5649",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "33d71711649b79e8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "审查报告.md",
+                "mode": "preview",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "审查报告"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "223fa0e392581229",
+    "type": "split",
+    "children": [
+      {
+        "id": "29bc3d3bcd1338b9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "57f4e7982f4d7040",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "7ba1b30b14b36dc7",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "8d1964b686462b97",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "3ba0f36b3b613818",
+    "type": "split",
+    "children": [
+      {
+        "id": "7b35d9effaffc50a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "020345c9d1ee18ce",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "审查报告.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "审查报告 的反向链接列表"
+            }
+          },
+          {
+            "id": "0a2f609c4d420cc3",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "审查报告.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "审查报告 的出链列表"
+            }
+          },
+          {
+            "id": "c43c6f54f5d706fb",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "1f36ee07e7d60553",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "676cc2ff6f8c02e6",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "审查报告.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "审查报告 的大纲"
+            }
+          }
+        ],
+        "currentTab": 4
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "33d71711649b79e8",
+  "lastOpenFiles": [
+    "Temp/UnityTempFile-c27ac378623762b4d9ad9d2d5eccdab9",
+    "MyWindowsServer/MyWindowsServer/ConnectClientSocket.cs~",
+    "Library/ProtocolInstance.json",
+    "MyWindowsServer/MyWindowsServer/ListenSocket.cs~",
+    "Library/Search/propertyDatabase.db_fa8a1509ae514326ad92b4aab0ad205b_temp",
+    "Library/Search/propertyAliases.db_01e6eb65ef2c4b33b7d633e032454b48_temp",
+    "Library/Bee/TundraBuildState.state",
+    "MyWindowsServer/MyWindowsServer/PlayerMsg.cs~",
+    "Temp/__Backupscenes/0.backup",
+    "Temp/__Backupscenes",
+    "Library/Search/propertyAliases.db_12c648fd30914fe9bd5175d3fc5fad91_temp"
+  ]
+}
