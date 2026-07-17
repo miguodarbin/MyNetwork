@@ -185,16 +185,16 @@
   },
   "active": "33d71711649b79e8",
   "lastOpenFiles": [
-    "Library/Search/propertyAliases.db_7b42e85b1125446490684aa316a01e3c_temp",
-    "Library/Search/propertyAliases.db_f85f0f71f7a1440d880c1612d232ae12_temp",
-    "Temp/UnityTempFile-6442c9d44d2d32f4ab64636d9aacec6a",
-    "Assets/_Project/Scripts/Test/SampleScene.unity.meta",
-    "Assets/_Project/Scripts/Test/SampleScene.unity",
-    "MyWindowsServer/MyWindowsServer/TcpServer.cs~",
-    "MyWindowsServer/MyWindowsServer/ClientSession.cs~",
     "Library/ProtocolInstance.json",
-    "Library/Search/propertyDatabase.db_7e0cc118224c4e2e9b8db8fa19baba66_temp",
-    "Assets/_Project/Scripts/zPlayground/Playground.cs~",
-    "Library/Search/propertyDatabase.db_2ee655d49bbe44e78c93dc36a2cee241_temp"
+    "Assets/_Project/Scripts/Core/NetworkManager.cs~",
+    "Library/Bee/TundraBuildState.state",
+    "Temp/UnityTempFile-d937412cddf91b74d850e323f6954f05",
+    "Library/Search/propertyAliases.db_6f7c5b557d7149fcbaed7ee586b2a984_temp",
+    "Library/Search/propertyAliases.db_36e9b6f7382145c0912d805696a09496_temp",
+    "Library/Search/propertyAliases.db_288a92f504e24f9a9b999db93c51a89e_temp",
+    "Library/Artifacts/a3/a3bb4e76de4ee815a7fa3f80186199d8",
+    "Library/Artifacts/60/60a72c7fc2ee3035657a0a259871442b",
+    "Assets/_Project/Scripts/Test/QuitMsg.cs.meta",
+    "Assets/_Project/Scripts/Test/QuitMsg.cs"
   ]
 }

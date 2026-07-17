@@ -91,8 +91,7 @@ public class ClientSession
                 if (msgBytesCount == 0)
                 {
                     Console.WriteLine(
-                        "【系统】客户端正常关闭连接：" +
-                        socket.RemoteEndPoint
+                        "【系统】客户端正常关闭连接：" + socket.RemoteEndPoint
                     );
 
                     Close();
@@ -310,8 +309,7 @@ public class ClientSession
 
     //保护_connectClientSocket字段的读取和置空操作
     private readonly object _socketLock = new object();
-
-
+    
     public void Close()
     {
         Socket socket;

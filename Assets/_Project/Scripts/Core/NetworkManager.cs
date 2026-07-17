@@ -214,9 +214,31 @@ public class NetworkManager : MonoBehaviour
                     //不断的接收客户端的发来的字节，然后放到缓存区里。只要一有内容放到缓存区就调用ProcessTCPOriginalBytes()
                     ProcessTCPOriginalBytes();
                 }
+                //Close方法会关闭并释放 Socket，这会让Receive方法报错，捕获错误并判断
                 catch (SocketException e)
                 {
-                    Debug.Log(e.Message);
+                    //如果客户端都还没有来得及Close，就恢复了线程，此时已经执行过_clientSocket.Shutdown(SocketShutdown.Both);了，但还没有释放，但_needConnectToServer已经false了
+                    if (!_needConnectToServer)
+                    {
+                        break;
+                    }
+
+                    // 当前仍然需要连接，却发生了 SocketException，
+                    // 才说明出现了真正的网络异常。
+                    Debug.LogError($"网络连接异常：{e.Message}");
+                    _needConnectToServer = false;
+                    break;
+                }
+                catch (ObjectDisposedException e) //如果是客户端自己调用的Close Socket，资源被释放了，会报资源释放的错误，并且_needConnectToServer为false，属于正常情况
+                {
+                    // 本地主动 Close Socket 后，报的资源释放错误是正常的
+                    if (!_needConnectToServer)
+                    {
+                        break;
+                    }
+
+                    //如果不是自己调用的Close Socket，资源也被释放了，那就说明不是走的预期流程
+                    Debug.LogError($"Socket 被异常释放：{e.Message}");
                     _needConnectToServer = false;
                     break;
                 }
@@ -293,7 +315,7 @@ public class NetworkManager : MonoBehaviour
             }
         }
     }
-    
+
     /// <summary>
     /// 尝试从接收完成帧队列中取出一条完整帧。
     /// 返回 true 表示成功取到；返回 false 表示当前没有完整帧。
