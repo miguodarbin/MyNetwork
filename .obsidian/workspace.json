@@ -185,16 +185,16 @@
   },
   "active": "33d71711649b79e8",
   "lastOpenFiles": [
-    "MyWindowsServer/MyWindowsServer/ConnectClientSocket.cs~",
-    "MyWindowsServer/MyWindowsServer/ListenSocket.cs~",
-    "Temp/UnityTempFile-4eb20b4e2b55dac4ba16bfa39b9b6dbc",
+    "Library/Search/propertyAliases.db_7b42e85b1125446490684aa316a01e3c_temp",
+    "Library/Search/propertyAliases.db_f85f0f71f7a1440d880c1612d232ae12_temp",
+    "Temp/UnityTempFile-6442c9d44d2d32f4ab64636d9aacec6a",
+    "Assets/_Project/Scripts/Test/SampleScene.unity.meta",
+    "Assets/_Project/Scripts/Test/SampleScene.unity",
+    "MyWindowsServer/MyWindowsServer/TcpServer.cs~",
+    "MyWindowsServer/MyWindowsServer/ClientSession.cs~",
     "Library/ProtocolInstance.json",
-    "Temp/UnityTempFile-10f3632a2a878b14ea56eca302409bf1",
-    "Library/Search/propertyDatabase.db_020ac2f604064240943d50fc3530ec10_temp",
-    "Library/Search/propertyAliases.db_09526bc1135547fc9f2732b458c55850_temp",
-    "Library/Search/propertyDatabase.db_2f9dbcd90f13419fa3908264e1fb0a1a_temp",
-    "Library/Search/propertyAliases.db_b367634d8ac24c73ae7d5d124f0425bf_temp",
-    "Library/Search/propertyDatabase.db_23086d1c93f3438a805c7b83295cfef4_temp",
-    "Library/Search/propertyAliases.db_757cb22fbb3e491abe8570c87f31baec_temp"
+    "Library/Search/propertyDatabase.db_7e0cc118224c4e2e9b8db8fa19baba66_temp",
+    "Assets/_Project/Scripts/zPlayground/Playground.cs~",
+    "Library/Search/propertyDatabase.db_2ee655d49bbe44e78c93dc36a2cee241_temp"
   ]
 }

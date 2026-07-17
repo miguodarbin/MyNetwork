@@ -17,7 +17,7 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        ListenSocket listenSocket = new ListenSocket();
+        TcpServer listenSocket = new TcpServer();
         listenSocket.StartListen("192.168.0.196", 8080);
         Console.WriteLine("开始监听...");
 
@@ -32,7 +32,7 @@ public class Program
 
             if (input == "quit")
             {
-                listenSocket.CloseListenSocketAndCommSocket();
+                listenSocket.CloseTcpServerAndSessions();
                 break;
             }
 
@@ -63,7 +63,7 @@ public class Program
                 Console.WriteLine("已发送");
             }
 
-            if (input == "fn")
+            if (input == "分包黏包")
             {
                 StringMsg msg = new StringMsg("黏包的String");
                 StringMsg msg2 = new StringMsg("NianBaoのString");

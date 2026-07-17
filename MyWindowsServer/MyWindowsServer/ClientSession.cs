@@ -7,7 +7,7 @@ namespace MyWindowsServer;
 /// <summary>
 /// 这个类就是对普通的C#Socket进行的一次封装。给原生的C#Socket多搞了一些“连接客户端侧”相关常用的方法（虽然C#的Socket也是封装的SocketAPI里的Socket）
 /// </summary>
-public class ConnectClientSocket
+public class ClientSession
 {
     //用来专门产出唯一ID的
     private static int IDCreator = -1;
@@ -15,14 +15,16 @@ public class ConnectClientSocket
     //这是原生的C#侧的Socket，本类主要就是对他进行封装，给他增加一些“连接客户端侧”相关常用的方法
     private Socket _connectClientSocket;
 
-    //连接客户端的通信Socket的id
+    //连接客户端的通信 ClientSession 的id
     public int ID { get; private set; }
 
-    //构造函数，要求外部必须要给到一个原生的 连接客户端 的通信Socket，才能创建我这个封装的 连接客户端的通信Socket
-    public ConnectClientSocket(Socket originConnetClientSocket)
+    //构造函数，要求TcpServer必须要给到一个原生的 连接客户端 的通信Socket，才能创建我这个封装的 连接客户端的通信Socket
+    //并且TcpServer还要能接收当这个客户端对话被关掉之后，客户端对话给到的自己的ID
+    public ClientSession(Socket originConnetClientSocket, Action<int> onSessionClosed)
     {
         this._connectClientSocket = originConnetClientSocket;
         this.ID = ++IDCreator;
+        _onSessionClosed = onSessionClosed;
     }
 
     //=========================================接收远程客户端frame=========================================
@@ -30,8 +32,6 @@ public class ConnectClientSocket
     //先搞一个水桶，方便去系统那边捞传输过来的字节
     byte[] buffer = new byte[1024 * 1024];
 
-    //处理完分包粘包的字节数组区Queue<byte[]>：被 ProcessTCPStream 处理过的字节数组才往里面放，一个字节数组代表一个完整消息。由外部取消费这个Queue<byte>消息
-    private Queue<byte[]> _processedMsgQueue = new Queue<byte[]>();
 
     //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
     private Queue<byte> _originalBytesQueue = new Queue<byte>();
@@ -119,6 +119,7 @@ public class ConnectClientSocket
             catch (ObjectDisposedException)
             {
                 //唤醒线程不仅是条件满足可以唤醒，比如这里，是Socket能拿到操作系统接收到的字节，唤醒条件不仅仅是操作系统那边有字节，如果Socket自己被释放掉，也是一个唤醒条件
+                Close();
                 break;
             }
         }
@@ -158,8 +159,7 @@ public class ConnectClientSocket
                         msgBytes[i] = _originalBytesQueue.Dequeue();
                     }
 
-                    _processedMsgQueue.Enqueue(msgBytes);
-                    ProgressReceivedMsg();
+                    ProcessReceivedFrame(msgBytes);
 
                     //游标置零，让下一次循环时，游标指向消息头。否则游标一直是旧值，而Queue队列不断变化，会无法对齐。不用打破循环，一直走到打破循环的分支上去。
                     cursor = 0;
@@ -175,8 +175,7 @@ public class ConnectClientSocket
                         msgBytes[i] = _originalBytesQueue.Dequeue();
                     }
 
-                    _processedMsgQueue.Enqueue(msgBytes);
-                    ProgressReceivedMsg();
+                    ProcessReceivedFrame(msgBytes);
 
                     //打破循环，因为缓存区再拿完这条消息之后就没字节了。
                     break;
@@ -196,48 +195,63 @@ public class ConnectClientSocket
         }
     }
 
-    //单独开一个处理消息的异步方法任务，交给Task去处理
-    private async void ProgressReceivedMsg()
-    {
-        await Task.Run(() =>
-        {
-            //处理接到的字节的方法！！
-            byte[] needProgressMsg = _processedMsgQueue.Dequeue();
-            //先读取头四个字节也就是int MsgType
-            int MsgType = BitConverter.ToInt32(needProgressMsg, 0);
-            switch (MsgType)
-            {
-                case 1000:
-                    StringMsg stringMsg = new StringMsg();
-                    stringMsg.DeSerializeFormBytes(needProgressMsg);
-                    Console.WriteLine(stringMsg.msg);
-                    break;
 
-                case 1001:
-                    PlayerMsg playerMsg = new PlayerMsg();
-                    playerMsg.DeSerializeFormBytes(needProgressMsg);
-                    Console.WriteLine(playerMsg.playerId);
-                    Console.WriteLine(playerMsg.playerData.playerAge);
-                    Console.WriteLine(playerMsg.playerData.playerHealth);
-                    Console.WriteLine(playerMsg.playerData.playerName);
-                    Console.WriteLine(playerMsg.playerData.playerSex);
-                    break;
+    //就用普通的同步方法处理这个Frame就行，之前想的是怕处理Frame太耗时，影响处理别的消息分包黏包，用的是异步Task单开了一个线程处理Frame，等以后真耗时了再说吧
+    //并且就算这边处理的耗时，也不会影响最外部的主线程，只是会影响每个Socket自己接收消息的那个线程，问题不大
+    private void ProcessReceivedFrame(byte[] frameBytes)
+    {
+        //完整帧的前4个字节是消息类型ID
+        int msgType = BitConverter.ToInt32(frameBytes, 0);
+
+        switch (msgType)
+        {
+            case 1000:
+            {
+                StringMsg stringMsg = new StringMsg();
+                stringMsg.DeSerializeFormBytes(frameBytes);
+
+                Console.WriteLine(stringMsg.msg);
+                break;
             }
-        });
+
+            case 1001:
+            {
+                PlayerMsg playerMsg = new PlayerMsg();
+                playerMsg.DeSerializeFormBytes(frameBytes);
+
+                Console.WriteLine(playerMsg.playerId);
+                Console.WriteLine(playerMsg.playerData.playerAge);
+                Console.WriteLine(playerMsg.playerData.playerHealth);
+                Console.WriteLine(playerMsg.playerData.playerName);
+                Console.WriteLine(playerMsg.playerData.playerSex);
+                break;
+            }
+        }
     }
 
 
     //=========================================发送本地服务器frame=========================================
     public void SendBytesToClient(byte[] bytes)
     {
-        if (_connectClientSocket == null)
+        Socket socket;
+        //只有拿到钥匙才能对socket赋值，目的是不让关闭所产生的置空，会影响到这里的赋值，这里一定能拿到一个不为null的socket
+        //但需要注意的是，即使不为null，因为锁过了这边的赋值就失效了，接下来用SendCompleteFrame可能也无法发送，因为Socket对象已经关闭了
+        lock (_socketLock)
+        {
+            socket = _connectClientSocket;
+        }
+
+        //只有赋上值才能走发送逻辑
+        if (socket == null)
         {
             return;
         }
 
+        //为了防止这个执行SendCompleteFrame时候，有别的地方给Socket关闭了，导致发送报错，需要在外部捕获一下错误，因为try catch不一定非要写在报错那一行，也可以写在调用报错那一行的父方法那边，到时候报错会一层层往上找trycatch的
         try
         {
-            SendCompleteFrame(bytes);
+            //把这个不为null的socket执行发送完整信息的方法
+            SendCompleteFrame(socket, bytes);
         }
         catch (SocketException e)
         {
@@ -245,11 +259,16 @@ public class ConnectClientSocket
             Close();
             Console.WriteLine(e.Message);
         }
+        catch (ObjectDisposedException)
+        {
+            //拿到局部Socket以后，关闭线程仍可能将该Socket关闭
+            Close();
+        }
     }
 
 
     // 由于Send方法可能一次不会把传给他的frame都发出去，所以需要持续发送，直到一整个完整帧全部发送完成。
-    private void SendCompleteFrame(byte[] frameBytes)
+    private void SendCompleteFrame(Socket socket, byte[] frameBytes)
     {
         int offset = 0;
 
@@ -257,7 +276,7 @@ public class ConnectClientSocket
         {
             int remainingLength = frameBytes.Length - offset;
 
-            int sentCount = _connectClientSocket.Send(
+            int sentCount = socket.Send(
                 frameBytes,
                 offset,
                 remainingLength,
@@ -285,35 +304,56 @@ public class ConnectClientSocket
     }
 
 
+    //===========================================关闭相关======================================================
+    //当前会话关闭后，拿到TCPServer那边的移除字典中记录的回调函数，然后再Close里面掉
+    private readonly Action<int> _onSessionClosed;
+
+    //保护_connectClientSocket字段的读取和置空操作
+    private readonly object _socketLock = new object();
+
+
     public void Close()
     {
-        //改成局部变量形式，降低字段被并发置空带来的问题
-        Socket socket = _connectClientSocket;
+        Socket socket;
 
-        if (socket == null)
+        //锁住对socket的操作，除非拿到钥匙，才能对socket赋上值，并走close逻辑
+        lock (_socketLock)
         {
-            return;
-        }
+            socket = _connectClientSocket;
 
-        //先把字段置空，让后续发送和关闭请求知道会话已关闭
-        _connectClientSocket = null;
+            //这里只是对共享变量进行置空，如果别的地方还有对_connectClientSocket所指向的对象有所引用，那别的地方虽然还有Socket，但是指向的那个socket也已经被关闭了，因为后面就要处理关闭Socket的逻辑了
+            _connectClientSocket = null;
+        }
 
         try
         {
-            //主动中断正在阻塞的Receive
-            socket.Shutdown(SocketShutdown.Both);
-        }
-        catch (SocketException)
-        {
-            //Socket可能已经断开，忽略关闭阶段的异常
-        }
-        catch (ObjectDisposedException)
-        {
-            //Socket已经被其他路径释放
+            //只有真正拿到Socket的线程负责关闭
+            if (socket != null)
+            {
+                try
+                {
+                    //关闭收发方向，同时唤醒阻塞中的Receive
+                    socket.Shutdown(SocketShutdown.Both);
+                }
+                catch (SocketException)
+                {
+                    //对方可能已经断开
+                }
+                catch (ObjectDisposedException)
+                {
+                    //Socket可能已经被其他路径释放
+                }
+                finally
+                {
+                    socket.Close();
+                }
+            }
         }
         finally
         {
-            socket.Close();
+            //允许重复通知。
+            //ListenSocket使用TryRemove，所以重复移除不会报错。
+            _onSessionClosed?.Invoke(ID);
         }
     }
 }

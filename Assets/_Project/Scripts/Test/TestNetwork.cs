@@ -71,7 +71,17 @@ public class TestNetwork : MonoBehaviour
 
     private void OnSendFenBaoNianBaoButtonClick()
     {
-        Debug.Log("Send FenBaoNianBao");
+        StringMsg msg = new StringMsg("黏包的String");
+        StringMsg msg2 = new StringMsg("NianBaoのString");
+        byte[] nianBaoBytes = msg.SerializeToBytes().Concat(msg2.SerializeToBytes()).ToArray();
+
+        byte[] first = nianBaoBytes[0..25];
+        byte[] second = nianBaoBytes[25..];
+
+        NetworkManager.Instance.SendFrameToServer(first);
+        Thread.Sleep(1000);
+        NetworkManager.Instance.SendFrameToServer(second);
+        Console.WriteLine("已发送");
     }
 
     void Update()
