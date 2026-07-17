@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -34,7 +36,7 @@ public class NetworkManager : MonoBehaviour
             Destroy(this.gameObject);
         }
     }
-    
+
     //===============================================================================================
 
     //声明一个通信Socket，用来用TCP协议去找服务器通信
@@ -69,7 +71,7 @@ public class NetworkManager : MonoBehaviour
         //连接到服务器功能打开
         _needConnectToServer = true;
         //开启Manager的发送到服务器信息功能
-        ProgressSendBytesAsync();
+        ProgressSendFrameAsync();
         //开启Manager的收服务器消息功能
         ProgressReceivedBytesAsync();
         return true;
@@ -77,49 +79,71 @@ public class NetworkManager : MonoBehaviour
 
     //===================================================接收远程服务器frame===================================
 
-    //专门开一个队列，记录待发送的。然后有一个专门处理这个队列发送的异步方法，不会阻塞主线程
-    private Queue<Byte[]> _pendingSendBytesQueue = new Queue<Byte[]>();
-
+    //专门开一个自动阻塞线程的队列，记录待发送的。然后有一个专门处理这个队列发送的异步方法作为后台线程，不会阻塞主线程.Unity主线程负责入队，后台线程发送线程负责出队。
+    //没有数据时，消费线程会自动等待阻塞后台线程，后台线程不会空转。
+    private readonly BlockingCollection<byte[]> _pendingSendFrame = new BlockingCollection<byte[]>();
 
     /// <summary>
     /// 向客户端发送消息，内部是把消息排到一个队列里，然后靠ProgressSendBytesAsync异步处理发送消息
     /// </summary>
-    /// <param name="bytes"></param>
-    public void SendBytesToServer(byte[] bytes)
+    public void SendFrameToServer(byte[] frameBytes)
     {
-        _pendingSendBytesQueue.Enqueue(bytes);
+        //连接已经关闭时，不再接受发送请求
+        if (!_needConnectToServer)
+        {
+            return;
+        }
+
+        try
+        {
+            //尝试把完整帧放入待发送集合
+            //如果入队失败，直接丢弃本次发送请求
+            _pendingSendFrame.TryAdd(frameBytes);
+        }
+        catch (InvalidOperationException)
+        {
+            //检查连接状态之后，可能有其他线程刚好调用了 CompleteAdding。
+            //这属于正常的关闭竞争，直接丢弃本次发送请求。
+        }
     }
 
     //专门处理发送消息的异步方法，处理逻辑作为Task交给线程池，然后就会把执行权返回给调用者
-    private async void ProgressSendBytesAsync()
+    private async void ProgressSendFrameAsync()
     {
         await Task.Run(() =>
             {
-                while (_needConnectToServer)
+                //获取可以消费的遍历集合，每遍历一个元素，就会从原集合中拿走一个元素。当没有元素的时候，就会阻塞这个执行Task的线程，当有元素的时候，自动唤醒执行这个Task的线程继续执行。
+                foreach (byte[] frameBytes in _pendingSendFrame.GetConsumingEnumerable())
                 {
-                    if (_pendingSendBytesQueue.Count > 0)
+                    //关闭连接后，即使还有机会进入循环，也直接退出
+                    if (!_needConnectToServer)
                     {
-                        //从队列中取出一整个完整帧
-                        byte[] frameBytes = _pendingSendBytesQueue.Dequeue();
+                        break;
+                    }
 
-                        try
+                    try
+                    {
+                        //发送一整帧。如果发送失败，就不能继续处理后面的帧了。
+                        bool sendSucceeded = SendCompleteFrame(frameBytes);
+                        if (!sendSucceeded)
                         {
-                            SendCompleteFrame(frameBytes);
-                        }
-                        catch (SocketException e)
-                        {
-                            Debug.Log(e.Message);
                             _needConnectToServer = false;
                             break;
                         }
+                    }
+                    catch (SocketException e)
+                    {
+                        Debug.Log(e.Message);
+                        _needConnectToServer = false;
+                        break;
                     }
                 }
             }
         );
     }
-    
-    // 由于Send方法可能一次不会把传给他的frame都发出去，所以需要持续发送，直到一整个完整帧全部发送完成。
-    private void SendCompleteFrame(byte[] frameBytes)
+
+    // 由于Send方法可能一次不会把传给他的frame都发出去，所以需要持续发送，直到一整个完整帧全部发送完成。返回值代表是否完整的发送frame成功
+    private bool SendCompleteFrame(byte[] frameBytes)
     {
         //offset 表示：前面已经成功发送了多少字节
         int offset = 0;
@@ -143,27 +167,30 @@ public class NetworkManager : MonoBehaviour
             {
                 Debug.Log("发送消息失败");
                 _needConnectToServer = false;
-                return;
+                return false;
             }
 
             //根据本次实际发送量，推进已发送位置
             offset += sentCount;
         }
+
+        return true;
     }
 
 
     //===================================================发送本地客户端frame===================================
 
-    //处理完分包粘包的字节数组区Queue<byte[]>：被 ProcessTCPStream 处理过的字节数组才往里面放，一个字节数组代表一个完整消息。由外部取消费这个Queue<byte>消息
-    private Queue<byte[]> _processedMsgQueue = new Queue<byte[]>();
+    //处理完分包粘包的frame说存放的队列：被 ProcessTCPStream 处理完毕成为一个frame之后才往里面放，一个字节数组代表一个完整frame。由外部取消费这个Queue<byte>消息
+    //线程是安全的，unity主线程和后台处理接收消息的线程 可以同时操作_processedMsgQueue
+    private readonly ConcurrentQueue<byte[]> _processedMsgQueue = new ConcurrentQueue<byte[]>();
 
-    //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
+    //不管 37 二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
     private Queue<byte> _originalBytesQueue = new Queue<byte>();
 
     //声明一个容器，作为专门去操作系统那边的的Socket收消息缓冲区里面捞字节的水桶
     private byte[] originalBytesBucket = new byte[1024 * 1024];
 
-    //专门处理接受消息的异步方法，处理逻辑作为Task交给线程池，然后就会把执行权返回给调用者
+    //专门处理接受消息的异步方法，处理逻辑作为Task交给线程池，然后就会把执行权返回给调用者。单开一个线程去接收消息的原因是_clientSocket.Receive(...) 是同步阻塞 API。不能卡住InitNetworkManager
     private async void ProgressReceivedBytesAsync()
     {
         await Task.Run(() =>
@@ -266,31 +293,14 @@ public class NetworkManager : MonoBehaviour
             }
         }
     }
-
-    //暴露给外部一个从收消息的队列里看有没有东西的方法
-    public bool IsHaveServerSendMsg()
-    {
-        if (_processedMsgQueue.Count > 0)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
+    
     /// <summary>
-    /// 暴露给外部一个从收消息的队列里拿东西的方法,只要能拿到，就说明消息一定是完整的，一定是经过分包黏包处理过的
+    /// 尝试从接收完成帧队列中取出一条完整帧。
+    /// 返回 true 表示成功取到；返回 false 表示当前没有完整帧。
     /// </summary>
-    public byte[] GetServerSendMsg()
+    public bool TryDequeueReceivedFrame(out byte[] frameBytes)
     {
-        if (IsHaveServerSendMsg())
-        {
-            return _processedMsgQueue.Dequeue();
-        }
-
-        return null;
+        return _processedMsgQueue.TryDequeue(out frameBytes);
     }
 
     //关闭对服务器的连接
@@ -299,7 +309,12 @@ public class NetworkManager : MonoBehaviour
         _needConnectToServer = false;
         _clientSocket.Shutdown(SocketShutdown.Both);
         _clientSocket.Close();
-        _pendingSendBytesQueue.Clear();
+
+        if (!_pendingSendFrame.IsAddingCompleted) //判断一下是否已经标记完成添加了，防止重复标记
+        {
+            _pendingSendFrame.CompleteAdding(); //将容器标记为完成了添加，不再添加新的项了
+        }
+
         _processedMsgQueue.Clear();
     }
 

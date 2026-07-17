@@ -50,7 +50,6 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
 
     protected void ReadAllFieldBytesToMsgHeader()
     {
-        TrySetMsgTypeID();
         msgTypeID = ReadAllBytesToIntType();
         msgBodyCount = ReadAllBytesToIntType();
     }

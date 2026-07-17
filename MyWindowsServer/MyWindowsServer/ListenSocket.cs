@@ -7,7 +7,11 @@ namespace MyWindowsServer;
 
 /// <summary>
 /// 这个类就是对普通的C#Socket进行的一次封装。给原生的C#Socket多搞了一些“监听侧”相关常用的方法（虽然C#的Socket也是封装的SocketAPI里的Socket）
+/// TODO：以后如果学了异步的TCP通讯方法后，要将这里处理接收消息的模型调整，
+/// TODO：目前的模型是：统一开一个后台线程用阻塞方法接客户端Socket，然后接到一个客户端Socket就给他开启一个单独的线程去运行阻塞的接收消息方法，这就会导致客户端一多，占很多线程
+/// TODO：以后要解决这个问题
 /// </summary>
+
 public class ListenSocket
 {
     //开启一个监听客户端的Socket，客户端的Socket不和这个监听Socket连接，只作为监听用
@@ -33,13 +37,13 @@ public class ListenSocket
         //给这个封装侧的Socket打开
         _isEnable = true;
         //然后就可以开始取监听结果了，并且一直要能取结果。监听好的结果放一个Dictionary里面，key是通信Socket的ID，value是通信Socket
-        //注意，目前我只学了同步取的方法，所以为了不阻塞这边的线程，所以我新开一个异步方法，在异步方法里面用await Task去取结果
+        //注意，目前我只学了同步取的方法，所以为了不阻塞这边的线程，所以我新开一个异步方法，也就相当于开了一个专门去接收客户端的线程，去取TCP连接的结果
+        //取到结果后，也会为取到结果的通信Socket各自开一个自己接收客户端消息的能力：StartReceiveLoop()
         AutoAcceptSocket();
-        //用异步方法，同Task统一的、不停的处理所有通信Socket的接收信息
-        ProcessAllClientMsg();
+
     }
 
-    //自动去拿操作系统里_listenSocket的TCP连接信息
+    //自动去拿操作系统里_listenSocket的TCP连接信息的一个线程
     private async void AutoAcceptSocket()
     {
         //由于拿的方法Accept()是阻塞式的，所以把这个方法作为Task交给线程池去做
@@ -67,8 +71,10 @@ public class ListenSocket
 
                     //系统提示一下，有客户端接入了
                     Console.WriteLine("【系统】" + connetClientSocket.GetRemoteClientEndPoint() + "已接入");
-                    //还要把它作为 _listenSocket监听到的 连接客户端的通信Socket 管理起来
+                    //还要把它作为 _listenSocket监听到的 连接客户端的通信Socket 管理起来，
                     _connectClientSocketDict.Add(connetClientSocket.ID, connetClientSocket);
+                    //每个和客户端通信的Socket用字节的接收循环，去接收客户端发来的消息
+                    connetClientSocket.StartReceiveLoop();
                 }
                 catch (SocketException e)
                 {
@@ -82,25 +88,6 @@ public class ListenSocket
         });
     }
 
-    /// <summary>
-    /// 统一处理所有通信Socket的接收信息
-    /// </summary>
-    private async void ProcessAllClientMsg()
-    {
-        await Task.Run(() =>
-        {
-            while (_isEnable)
-            {
-                if (_connectClientSocketDict.Count > 0)
-                {
-                    foreach (ConnectClientSocket connectClientSocket in _connectClientSocketDict.Values)
-                    {
-                        connectClientSocket.ReceiveClientMsgAndProgress();
-                    }
-                }
-            }
-        });
-    }
 
     /// <summary>
     /// 关闭监听Socket，这也会同时移除掉这个ListenSocket下的通信Socket

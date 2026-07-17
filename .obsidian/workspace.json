@@ -185,16 +185,16 @@
   },
   "active": "33d71711649b79e8",
   "lastOpenFiles": [
-    "Temp/UnityTempFile-c27ac378623762b4d9ad9d2d5eccdab9",
     "MyWindowsServer/MyWindowsServer/ConnectClientSocket.cs~",
-    "Library/ProtocolInstance.json",
     "MyWindowsServer/MyWindowsServer/ListenSocket.cs~",
-    "Library/Search/propertyDatabase.db_fa8a1509ae514326ad92b4aab0ad205b_temp",
-    "Library/Search/propertyAliases.db_01e6eb65ef2c4b33b7d633e032454b48_temp",
-    "Library/Bee/TundraBuildState.state",
-    "MyWindowsServer/MyWindowsServer/PlayerMsg.cs~",
-    "Temp/__Backupscenes/0.backup",
-    "Temp/__Backupscenes",
-    "Library/Search/propertyAliases.db_12c648fd30914fe9bd5175d3fc5fad91_temp"
+    "Temp/UnityTempFile-4eb20b4e2b55dac4ba16bfa39b9b6dbc",
+    "Library/ProtocolInstance.json",
+    "Temp/UnityTempFile-10f3632a2a878b14ea56eca302409bf1",
+    "Library/Search/propertyDatabase.db_020ac2f604064240943d50fc3530ec10_temp",
+    "Library/Search/propertyAliases.db_09526bc1135547fc9f2732b458c55850_temp",
+    "Library/Search/propertyDatabase.db_2f9dbcd90f13419fa3908264e1fb0a1a_temp",
+    "Library/Search/propertyAliases.db_b367634d8ac24c73ae7d5d124f0425bf_temp",
+    "Library/Search/propertyDatabase.db_23086d1c93f3438a805c7b83295cfef4_temp",
+    "Library/Search/propertyAliases.db_757cb22fbb3e491abe8570c87f31baec_temp"
   ]
 }

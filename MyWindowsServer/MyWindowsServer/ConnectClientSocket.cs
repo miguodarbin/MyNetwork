@@ -36,40 +36,91 @@ public class ConnectClientSocket
     //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
     private Queue<byte> _originalBytesQueue = new Queue<byte>();
 
+    //当前客户端会话专属的接收线程。这个线程只负责当前客户端的阻塞 Receive 循环。
+    private Thread _receiveThread;
+
 
     /// <summary>
-    /// 去操作系统那边捞字节
+    /// 启动当前和客户端通信的Socket自己的、专属接收循环。
+    /// 每个会话只允许启动一次。
     /// </summary>
-    public void ReceiveClientMsgAndProgress()
+    public void StartReceiveLoop()
     {
-        if (_connectClientSocket == null)
+        //不允许重复开始接收消息的线程
+        if (_receiveThread != null)
         {
             return;
         }
 
-        try
+        //创建一条真正由当前会话持有的线程。Receive 是同步阻塞方法，所以放到自己专属的线程里执行。
+        _receiveThread = new Thread(ReceiveLoop);
+
+        //设置为后台线程。防止服务端退出时被接收线程卡住
+        //这样服务端主线程退出时，不会因为这条接收线程仍存在而阻止进程结束。
+        _receiveThread.IsBackground = true;
+
+        //启动后，线程会进入 ReceiveLoop。
+        _receiveThread.Start();
+    }
+
+
+    /// <summary>
+    /// 当前客户端会话的专属阻塞接收循环。
+    /// </summary>
+    private void ReceiveLoop()
+    {
+        //保存本次接收循环使用的Socket引用。
+        //外部Close时即使字段被置空，也可以通过关闭这个Socket
+        //使阻塞中的Receive返回或抛出异常。
+        Socket socket = _connectClientSocket;
+
+        if (socket == null)
         {
-            //必须确认有字节才能去捞，否则会严重阻塞调用者线程。
-            if (_connectClientSocket.Available <= 0)
-            {
-                return;
-            }
-
-            //这个Receive是一个阻塞方法，如果在操作系统那边捞不着消息，就会一直卡在这里，我觉得没问题，不用开Task
-            int msgBytesCount = _connectClientSocket.Receive(buffer);
-
-            for (int i = 0; i < msgBytesCount; i++)
-            {
-                _originalBytesQueue.Enqueue(buffer[i]);
-            }
-
-            ProcessTCPOriginalBytes();
+            return;
         }
-        catch (SocketException e)
+
+        while (true)
         {
-            Console.WriteLine("【系统】" + "接收消息出错");
-            Close();
-            Console.WriteLine(e.Message);
+            try
+            {
+                //不再检查Available。
+                //暂时没有数据时，当前客户端自己的后台线程阻塞在这里。
+                int msgBytesCount = socket.Receive(buffer);
+
+                //TCP Receive返回0，表示对方正常关闭了连接。
+                if (msgBytesCount == 0)
+                {
+                    Console.WriteLine(
+                        "【系统】客户端正常关闭连接：" +
+                        socket.RemoteEndPoint
+                    );
+
+                    Close();
+                    break;
+                }
+
+                //把本次收到的有效字节加入流缓存区
+                for (int i = 0; i < msgBytesCount; i++)
+                {
+                    _originalBytesQueue.Enqueue(buffer[i]);
+                }
+
+                //继续使用原来的分帧逻辑
+                ProcessTCPOriginalBytes();
+            }
+            catch (SocketException e)
+            {
+                Console.WriteLine("【系统】接收客户端消息出错");
+                Console.WriteLine(e.Message);
+
+                Close();
+                break;
+            }
+            catch (ObjectDisposedException)
+            {
+                //唤醒线程不仅是条件满足可以唤醒，比如这里，是Socket能拿到操作系统接收到的字节，唤醒条件不仅仅是操作系统那边有字节，如果Socket自己被释放掉，也是一个唤醒条件
+                break;
+            }
         }
     }
 
@@ -236,13 +287,33 @@ public class ConnectClientSocket
 
     public void Close()
     {
-        if (_connectClientSocket == null)
+        //改成局部变量形式，降低字段被并发置空带来的问题
+        Socket socket = _connectClientSocket;
+
+        if (socket == null)
         {
             return;
         }
 
-        _connectClientSocket.Shutdown(SocketShutdown.Both);
-        _connectClientSocket.Close();
+        //先把字段置空，让后续发送和关闭请求知道会话已关闭
         _connectClientSocket = null;
+
+        try
+        {
+            //主动中断正在阻塞的Receive
+            socket.Shutdown(SocketShutdown.Both);
+        }
+        catch (SocketException)
+        {
+            //Socket可能已经断开，忽略关闭阶段的异常
+        }
+        catch (ObjectDisposedException)
+        {
+            //Socket已经被其他路径释放
+        }
+        finally
+        {
+            socket.Close();
+        }
     }
 }
