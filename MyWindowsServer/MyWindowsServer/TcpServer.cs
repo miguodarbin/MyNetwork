@@ -111,7 +111,7 @@ public class TcpServer
     }
 
 
-    public void BroadcastToAllClients(byte[] bytes)
+    public void BroadcastToAllClients(byte[] frameBytes)
     {
         //获取当前活动会话的独立数组快照,因为可能在广播的过程中，又有新的Client加入字典
         ClientSession[] sessionSnapshot = _connectClientSocketDict.Values.ToArray();
@@ -120,7 +120,7 @@ public class TcpServer
         {
             try
             {
-                session.SendBytesToClient(bytes);
+                session.SendBytesToClient(frameBytes);
             }
             catch (Exception e)
             {

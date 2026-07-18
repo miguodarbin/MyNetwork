@@ -185,16 +185,16 @@
   },
   "active": "33d71711649b79e8",
   "lastOpenFiles": [
-    "Temp/UnityTempFile-d911b228896623c469916323e55d960d",
-    "Library/ProtocolInstance.json",
-    "Library/Search/propertyDatabase.db_36adb183b090446da0a4f5eb0dbb7f1e_temp",
-    "Library/Bee/TundraBuildState.state",
-    "Temp/UnityTempFile-7cc0fb8fb442c63449c29547b13a8ce2",
-    "MyWindowsServer/MyWindowsServer/ClientSession.cs~",
-    "Assets/_Project/Scripts/Core/NetworkManager.cs~",
-    "Library/Search/propertyDatabase.db_19f9ab71ce444a2abebfacc2e8ae9657_temp",
-    "Temp/__Backupscenes/0.backup",
-    "Temp/UnityTempFile-2b9f6fe95be9b0f47a08a19fd37517a7",
-    "Temp/__Backupscenes"
+    "obj/Debug/Assembly-CSharp.csproj.FileListAbsolute.txt",
+    "Temp/Bin/Debug/Assembly-CSharp/Assembly-CSharp.pdb",
+    "Temp/Bin/Debug/Assembly-CSharp/Assembly-CSharp.dll",
+    "obj/Debug/Assembly.44154EF1.Up2Date",
+    "Temp/Bin/Debug/Assembly-CSharp/UnityEngine.TestRunner.pdb",
+    "Temp/Bin/Debug/Assembly-CSharp/UnityEngine.NVIDIAModule.xml",
+    "Temp/Bin/Debug/Assembly-CSharp/UnityEditor.TestRunner.pdb",
+    "Temp/Bin/Debug/Assembly-CSharp/Unity.VisualScripting.Flow.Editor.pdb",
+    "Temp/Bin/Debug/Assembly-CSharp/Unity.VisualScripting.Flow.pdb",
+    "Temp/Bin/Debug/Assembly-CSharp/Unity.VSCode.Editor.pdb",
+    "Temp/Bin/Debug/Assembly-CSharp/Unity.VisualScripting.State.pdb"
   ]
 }

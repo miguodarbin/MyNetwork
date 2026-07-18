@@ -113,6 +113,17 @@ public class ClientSession
                 //继续使用原来的分帧逻辑
                 ProcessTCPOriginalBytes();
             }
+            catch (InvalidDataException e)
+            {
+                // 外层帧可能完整，但消息体内部字段违反协议。
+                Console.WriteLine(
+                    $"【协议错误】客户端 {ID} 发送了非法消息：{e.Message}"
+                );
+
+                // 当前连接的数据已经不可信，关闭当前会话。
+                Close();
+                break;
+            }
             catch (SocketException e)
             {
                 Console.WriteLine("【系统】接收客户端消息出错");
@@ -229,7 +240,7 @@ public class ClientSession
             case 1000:
             {
                 StringMsg stringMsg = new StringMsg();
-                stringMsg.DeSerializeFormBytes(frameBytes);
+                stringMsg.DeSerializeFormFrameBytes(frameBytes);
 
                 Console.WriteLine(stringMsg.msg);
                 break;
@@ -238,7 +249,7 @@ public class ClientSession
             case 1001:
             {
                 PlayerMsg playerMsg = new PlayerMsg();
-                playerMsg.DeSerializeFormBytes(frameBytes);
+                playerMsg.DeSerializeFormFrameBytes(frameBytes);
 
                 Console.WriteLine(playerMsg.playerId);
                 Console.WriteLine(playerMsg.playerData.playerAge);

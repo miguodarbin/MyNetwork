@@ -21,24 +21,24 @@ public class PlayerData : CanBeBinarySerialize<PlayerData>
     {
     }
 
-    public override int GetAllBytesLength()
+    public override int GetFrameBytesLength()
     {
-        return GetStringTypeAllCount(playerName) + sizeof(float) + sizeof(int) + sizeof(bool);
+        return GetStringTypeFrameBytes(playerName) + sizeof(float) + sizeof(int) + sizeof(bool);
     }
 
-    protected override void WriteInAllFieldBytes()
+    protected override void WriteFrameBytes()
     {
-        WriteStringTypeToAllBytes(playerName);
-        WriteFloatTypeToAllBytes(playerHealth);
-        WriteIntTypeToAllBytes(playerAge);
-        WriteBoolTypeToAllBytes(playerSex);
+        WriteStringTypeToFrameBytes(playerName);
+        WriteFloatTypeToFrameBytes(playerHealth);
+        WriteIntTypeToFrameBytes(playerAge);
+        WriteBoolTypeToFrameBytes(playerSex);
     }
 
-    protected override void ReadFromAllBytes()
+    protected override void ReadFromFrameBytes()
     {
-        playerName = ReadAllBytesToStringType();
-        playerHealth = ReadAllBytesToFloatType();
-        playerAge = ReadAllBytesToIntType();
-        playerSex = ReadAllBytesToBoolType();
+        playerName = ReadFrameBytesToStringType();
+        playerHealth = ReadFrameBytesToFloatType();
+        playerAge = ReadFrameBytesToIntType();
+        playerSex = ReadFrameBytesToBoolType();
     }
 }

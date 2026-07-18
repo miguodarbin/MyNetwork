@@ -39,14 +39,14 @@ public class Program
             if (input == "SendPlayerMsg")
             {
                 PlayerMsg playerMsg = new PlayerMsg(3, new PlayerData("小炮", 3.14f, 88, false));
-                listenSocket.BroadcastToAllClients(playerMsg.SerializeToBytes());
+                listenSocket.BroadcastToAllClients(playerMsg.SerializeToFrameBytes());
             }
 
             if (input == "nianbao")
             {
                 StringMsg msg = new StringMsg("黏包的String");
                 StringMsg msg2 = new StringMsg("NianBaoのString");
-                byte[] nianBaoBytes = msg.SerializeToBytes().Concat(msg2.SerializeToBytes()).ToArray();
+                byte[] nianBaoBytes = msg.SerializeToFrameBytes().Concat(msg2.SerializeToFrameBytes()).ToArray();
                 listenSocket.BroadcastToAllClients(nianBaoBytes);
                 Console.WriteLine("已发送");
             }
@@ -54,7 +54,7 @@ public class Program
             if (input == "fenbao")
             {
                 StringMsg msg = new StringMsg("黏包的String");
-                byte[] nianBaoBytes = msg.SerializeToBytes();
+                byte[] nianBaoBytes = msg.SerializeToFrameBytes();
                 byte[] first = nianBaoBytes[0..8];
                 byte[] second = nianBaoBytes[8..];
                 listenSocket.BroadcastToAllClients(first);
@@ -67,7 +67,7 @@ public class Program
             {
                 StringMsg msg = new StringMsg("黏包的String");
                 StringMsg msg2 = new StringMsg("NianBaoのString");
-                byte[] nianBaoBytes = msg.SerializeToBytes().Concat(msg2.SerializeToBytes()).ToArray();
+                byte[] nianBaoBytes = msg.SerializeToFrameBytes().Concat(msg2.SerializeToFrameBytes()).ToArray();
 
                 byte[] first = nianBaoBytes[0..25];
                 byte[] second = nianBaoBytes[25..];
@@ -78,14 +78,22 @@ public class Program
                 Console.WriteLine("已发送");
             }
 
+            if (input == "ff")
+            {
+                listenSocket.BroadcastToAllClients(new byte[]
+                {
+                    0xE8, 0x03, 0x00, 0x00,
+                    0x04, 0x00, 0x00, 0x00,
+                    0xFF, 0xFF, 0xFF, 0xFF
+                });
+            }
+
             if (input[0..Math.Min(2, input.Length)] == "b:")
             {
                 string msg = input[Math.Min(2, input.Length)..input.Length];
                 StringMsg stringMsg = new StringMsg(msg);
-                listenSocket.BroadcastToAllClients(stringMsg.SerializeToBytes());
+                listenSocket.BroadcastToAllClients(stringMsg.SerializeToFrameBytes());
             }
         }
-
-        Console.ReadKey();
     }
 }

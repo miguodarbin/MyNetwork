@@ -1,5 +1,9 @@
-
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 using System.Text;
+
 
 public abstract class CanBeBinarySerializeBase
 {
@@ -7,13 +11,14 @@ public abstract class CanBeBinarySerializeBase
 
 /// <summary>
 /// 需要被二进制序列化的必须要继承此类，如果序列化的字段里面有自定义类型，那个自定义类型也需要继承此类,注意，string和自定义类型的话的都会写入字节长度的头信息
+/// CanBeBinarySerialize里提供的frameBytes没有添加类型头和payload长度头
 /// </summary>
 /// <typeparam name="T">子类的类型</typeparam>
 public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T : CanBeBinarySerialize<T>, new()
 {
     //==================================================字段属性==================================================
     //内部来维护这个子类型的 总字节数组
-    protected byte[] allBytes;
+    protected byte[] frameBytes;
 
     //用来记录当前已经写到总字节数组的哪里了？
     private int _bytesReadOrWritePosition = 0;
@@ -23,76 +28,76 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
     /// <summary>
     /// 只要一访问这个方法就触发写入字节，不用子类写了
     /// </summary>
-    public byte[] SerializeToBytes()
+    public byte[] SerializeToFrameBytes()
     {
-        InitAllBytes();
-        WriteInAllFieldBytes();
-        return allBytes;
+        InitFrameBytesArray();
+        WriteFrameBytes();
+        return frameBytes;
     }
 
 
-    public void DeSerializeFormBytes(byte[] bytes)
+    public void DeSerializeFormFrameBytes(byte[] bytes)
     {
-        AssignmentAllBytes(bytes);
-        ReadFromAllBytes();
+        AssignmentToFrameBytes(bytes);
+        ReadFromFrameBytes();
     }
 
     //==================================================子类必须实现==================================================
     /// <summary>
     /// 要求子类必须实现获得 总字节数组总长度
     /// </summary>
-    public abstract int GetAllBytesLength();
+    public abstract int GetFrameBytesLength();
 
     /// <summary>
     /// 要求子类必须实现对这个 总的字节数组 的写入，用父类提供的方法写入，必须按规则和字段声明顺序写入！！这个方法由SerializeToBytes驱动，只允许重写不允许乱调，要调就调SerializeToBytes
     /// </summary>
-    protected abstract void WriteInAllFieldBytes();
+    protected abstract void WriteFrameBytes();
 
     /// <summary>
     ///要求子类必须实现对这个 总的字节数组 的写入，用父类提供的方法写入，必须按规则和字段声明顺序写入！！这个方法由DeSerializeFormBytes驱动，只允许重写不允许乱调，要调就调DeSerializeFormBytes
     /// </summary>
-    protected abstract void ReadFromAllBytes();
+    protected abstract void ReadFromFrameBytes();
 
 
     //==================================================提供给子类的方法==================================================
     /// <summary>
     /// 为总字节数组写入int类型，必须按规则和字段声明顺序写入！！
     /// </summary>
-    protected void WriteIntTypeToAllBytes(int value)
+    protected void WriteIntTypeToFrameBytes(int value)
     {
         byte[] valueBytes = BitConverter.GetBytes(value);
-        valueBytes.CopyTo(allBytes, _bytesReadOrWritePosition);
+        valueBytes.CopyTo(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(int);
     }
 
     /// <summary>
     /// 为总字节数组写入float类型，必须按规则和字段声明顺序写入！！
     /// </summary>
-    protected void WriteFloatTypeToAllBytes(float value)
+    protected void WriteFloatTypeToFrameBytes(float value)
     {
         byte[] valueBytes = BitConverter.GetBytes(value);
-        valueBytes.CopyTo(allBytes, _bytesReadOrWritePosition);
+        valueBytes.CopyTo(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(float);
     }
 
     /// <summary>
     /// 为总字节数组写入bool类型，必须按规则和字段声明顺序写入！！
     /// </summary>
-    protected void WriteBoolTypeToAllBytes(bool value)
+    protected void WriteBoolTypeToFrameBytes(bool value)
     {
         byte[] valueBytes = BitConverter.GetBytes(value);
-        valueBytes.CopyTo(allBytes, _bytesReadOrWritePosition);
+        valueBytes.CopyTo(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(bool);
     }
 
     /// <summary>
     /// 为总字节数组写入string类型，必须按规则和字段声明顺序写入！！
     /// </summary>
-    protected void WriteStringTypeToAllBytes(string value)
+    protected void WriteStringTypeToFrameBytes(string value)
     {
         byte[] valueBytes = Encoding.UTF8.GetBytes(value);
-        WriteIntTypeToAllBytes(valueBytes.Length);
-        valueBytes.CopyTo(allBytes, _bytesReadOrWritePosition);
+        WriteIntTypeToFrameBytes(valueBytes.Length);
+        valueBytes.CopyTo(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += valueBytes.Length;
     }
 
@@ -101,20 +106,20 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
     /// </summary>
     /// <param name="value">自定义类型对象</param>
     /// <typeparam name="TK">自定义类型对象的类型</typeparam>
-    protected void WriteCustomTypeToAllBytes<TK>(TK value) where TK : CanBeBinarySerialize<TK>, new()
+    protected void WriteCustomTypeToFrameBytes<TK>(TK value) where TK : CanBeBinarySerialize<TK>, new()
     {
-        byte[] valueBytes = value.SerializeToBytes();
+        byte[] valueBytes = value.SerializeToFrameBytes();
         int valueBytesCount = valueBytes.Length;
-        WriteIntTypeToAllBytes(valueBytesCount);
+        WriteIntTypeToFrameBytes(valueBytesCount);
 
-        valueBytes.CopyTo(allBytes, _bytesReadOrWritePosition);
+        valueBytes.CopyTo(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += valueBytes.Length;
     }
 
     /// <summary>
     /// 获得string类型的value的字节数组长度 + 记录这个字节数组长度的那个int的字节数组长度，也就是头信息和内容的总字节长度
     /// </summary>
-    protected int GetStringTypeAllCount(string value)
+    protected int GetStringTypeFrameBytes(string value)
     {
         int valueBytesCount = Encoding.UTF8.GetBytes(value).Length;
         return valueBytesCount + sizeof(int);
@@ -122,37 +127,37 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
 
     protected int GetCustomTypeAllCount<TK>(TK value) where TK : CanBeBinarySerialize<TK>, new()
     {
-        return sizeof(int) + value.GetAllBytesLength();
+        return sizeof(int) + value.GetFrameBytesLength();
     }
 
     //-------------------------------以下是读数组赋值---------------------------
-    protected int ReadAllBytesToIntType()
+    protected int ReadFrameBytesToIntType()
     {
         EnsureReadableBytes(sizeof(int));
-        int value = BitConverter.ToInt32(allBytes, _bytesReadOrWritePosition);
+        int value = BitConverter.ToInt32(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(int);
         return value;
     }
 
-    protected float ReadAllBytesToFloatType()
+    protected float ReadFrameBytesToFloatType()
     {
         EnsureReadableBytes(sizeof(float));
-        float value = BitConverter.ToSingle(allBytes, _bytesReadOrWritePosition);
+        float value = BitConverter.ToSingle(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(float);
         return value;
     }
 
-    protected bool ReadAllBytesToBoolType()
+    protected bool ReadFrameBytesToBoolType()
     {
         EnsureReadableBytes(sizeof(bool));
-        bool value = BitConverter.ToBoolean(allBytes, _bytesReadOrWritePosition);
+        bool value = BitConverter.ToBoolean(frameBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(bool);
         return value;
     }
 
-    protected string ReadAllBytesToStringType()
+    protected string ReadFrameBytesToStringType()
     {
-        int stringBytesLength = ReadAllBytesToIntType();
+        int stringBytesLength = ReadFrameBytesToIntType();
 
         // 网络提供的字符串长度不能为负数。
         if (stringBytesLength < 0)
@@ -167,14 +172,14 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
         EnsureReadableBytes(stringBytesLength);
 
 
-        string value = Encoding.UTF8.GetString(allBytes, _bytesReadOrWritePosition, stringBytesLength);
+        string value = Encoding.UTF8.GetString(frameBytes, _bytesReadOrWritePosition, stringBytesLength);
         _bytesReadOrWritePosition += stringBytesLength;
         return value;
     }
 
-    protected TK ReadAllBytesToCustomType<TK>() where TK : CanBeBinarySerialize<TK>, new()
+    protected TK ReadFrameBytesToCustomType<TK>() where TK : CanBeBinarySerialize<TK>, new()
     {
-        int fieldBytesLength = ReadAllBytesToIntType();
+        int fieldBytesLength = ReadFrameBytesToIntType();
 
         if (fieldBytesLength < 0)
         {
@@ -189,9 +194,9 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
 
 
         byte[] fieldBytes = new byte[fieldBytesLength];
-        Array.Copy(allBytes, _bytesReadOrWritePosition, fieldBytes, 0, fieldBytesLength);
+        Array.Copy(frameBytes, _bytesReadOrWritePosition, fieldBytes, 0, fieldBytesLength);
         TK fieldValue = new TK();
-        fieldValue.DeSerializeFormBytes(fieldBytes);
+        fieldValue.DeSerializeFormFrameBytes(fieldBytes);
         _bytesReadOrWritePosition += fieldBytesLength;
         return fieldValue;
     }
@@ -199,16 +204,16 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
 
     //==================================================辅助方法==================================================
     //每次开始完整序列化时，重新创建字节数组并重置写入位置。
-    private void InitAllBytes()
+    private void InitFrameBytesArray()
     {
-        allBytes = new byte[GetAllBytesLength()];
+        frameBytes = new byte[GetFrameBytesLength()];
         _bytesReadOrWritePosition = 0;
     }
 
     //每次开始反序列化时，将外部给到的总字节数组赋值
-    private void AssignmentAllBytes(byte[] bytes)
+    private void AssignmentToFrameBytes(byte[] bytes)
     {
-        allBytes = bytes;
+        frameBytes = bytes;
         _bytesReadOrWritePosition = 0;
     }
 
@@ -225,7 +230,7 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
             );
         }
 
-        if (allBytes == null)
+        if (frameBytes == null)
         {
             throw new InvalidDataException(
                 "协议读取失败：当前字节数组为空。"
@@ -234,17 +239,17 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
 
         // 理论上的状态保护，防止游标已经处于非法位置。
         if (_bytesReadOrWritePosition < 0 ||
-            _bytesReadOrWritePosition > allBytes.Length)
+            _bytesReadOrWritePosition > frameBytes.Length)
         {
             throw new InvalidDataException(
                 $"协议读取失败：读取位置非法，" +
                 $"position = {_bytesReadOrWritePosition}，" +
-                $"arrayLength = {allBytes.Length}"
+                $"arrayLength = {frameBytes.Length}"
             );
         }
 
         int remainingBytes =
-            allBytes.Length - _bytesReadOrWritePosition;
+            frameBytes.Length - _bytesReadOrWritePosition;
 
         // 比较剩余长度，而不是计算 position + count，
         // 避免加法自身发生整数溢出。

@@ -5,6 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// 继承MsgBase类的，完成GetAllFieldBytesLength、 WriteInAllFieldBytes、ReadFromAllFieldBytes时也要考虑MsgTypeID！！！把Msg的读写都放在最开头！！！
+/// 只有MsgBase才提供类型头和payload长度头
 /// </summary>
 public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinarySerialize<T>, new()
 {
@@ -12,7 +13,7 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
     private int msgTypeID = -999999999;
 
     //这个是消息体的长度，是我自己定义的，负数的时候就是没初始化
-    private int msgBodyCount = -888888888;
+    private int payloadLength = -888888888;
 
     public int MsgTypeID
     {
@@ -20,10 +21,10 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
         set { msgTypeID = value; }
     }
 
-    public int MsgBodyCount
+    public int PayloadLength
     {
-        get { return msgBodyCount; }
-        set { msgBodyCount = value; }
+        get { return payloadLength; }
+        set { payloadLength = value; }
     }
 
     /// <summary>
@@ -34,7 +35,7 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
     /// <summary>
     /// 子类实现消息的长度是多少
     /// </summary>
-    protected abstract void SetMsgBodyCount();
+    protected abstract void SetPayloadLength();
 
     //==================================================提供给子类的方法==================================================
     /// <summary>
@@ -44,14 +45,14 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
     protected void WriteMsgHeaderToAllFieldBytes()
     {
         TrySetMsgTypeID();
-        WriteIntTypeToAllBytes(msgTypeID);
-        WriteIntTypeToAllBytes(msgBodyCount);
+        WriteIntTypeToFrameBytes(msgTypeID);
+        WriteIntTypeToFrameBytes(payloadLength);
     }
 
     protected void ReadAllFieldBytesToMsgHeader()
     {
-        msgTypeID = ReadAllBytesToIntType();
-        msgBodyCount = ReadAllBytesToIntType();
+        msgTypeID = ReadFrameBytesToIntType();
+        payloadLength = ReadFrameBytesToIntType();
     }
 
     protected int GetMsgHeaderCount()
@@ -70,9 +71,9 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
             SetMsgTypeID();
         }
 
-        if (msgBodyCount == -888888888)
+        if (payloadLength == -888888888)
         {
-            SetMsgBodyCount();
+            SetPayloadLength();
         }
     }
 }

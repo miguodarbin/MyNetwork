@@ -17,23 +17,23 @@ public class PlayerMsg : MsgBase<PlayerMsg>
     }
 
 
-    public override int GetAllBytesLength()
+    public override int GetFrameBytesLength()
     {
         return GetMsgHeaderCount() + sizeof(int) + GetCustomTypeAllCount(playerData);
     }
 
-    protected override void WriteInAllFieldBytes()
+    protected override void WriteFrameBytes()
     {
         WriteMsgHeaderToAllFieldBytes();
-        WriteIntTypeToAllBytes(playerId);
-        WriteCustomTypeToAllBytes(playerData);
+        WriteIntTypeToFrameBytes(playerId);
+        WriteCustomTypeToFrameBytes(playerData);
     }
 
-    protected override void ReadFromAllBytes()
+    protected override void ReadFromFrameBytes()
     {
         ReadAllFieldBytesToMsgHeader();
-        playerId = ReadAllBytesToIntType();
-        playerData = ReadAllBytesToCustomType<PlayerData>();
+        playerId = ReadFrameBytesToIntType();
+        playerData = ReadFrameBytesToCustomType<PlayerData>();
     }
 
     protected override void SetMsgTypeID()
@@ -41,8 +41,8 @@ public class PlayerMsg : MsgBase<PlayerMsg>
         MsgTypeID = 1001;
     }
 
-    protected override void SetMsgBodyCount()
+    protected override void SetPayloadLength()
     {
-        MsgBodyCount = sizeof(int) + GetCustomTypeAllCount(playerData);
+        PayloadLength = sizeof(int) + GetCustomTypeAllCount(playerData);
     }
 }
