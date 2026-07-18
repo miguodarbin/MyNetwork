@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using UnityEngine;
 
@@ -131,6 +132,7 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
     //-------------------------------以下是读数组赋值---------------------------
     protected int ReadAllBytesToIntType()
     {
+        EnsureReadableBytes(sizeof(int));
         int value = BitConverter.ToInt32(allBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(int);
         return value;
@@ -138,6 +140,7 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
 
     protected float ReadAllBytesToFloatType()
     {
+        EnsureReadableBytes(sizeof(float));
         float value = BitConverter.ToSingle(allBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(float);
         return value;
@@ -145,6 +148,7 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
 
     protected bool ReadAllBytesToBoolType()
     {
+        EnsureReadableBytes(sizeof(bool));
         bool value = BitConverter.ToBoolean(allBytes, _bytesReadOrWritePosition);
         _bytesReadOrWritePosition += sizeof(bool);
         return value;
@@ -154,7 +158,19 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
     {
         int stringBytesLength = ReadAllBytesToIntType();
 
-        
+        // 网络提供的字符串长度不能为负数。
+        if (stringBytesLength < 0)
+        {
+            throw new InvalidDataException(
+                $"协议读取失败：字符串字节长度不能为负数，" +
+                $"length = {stringBytesLength}"
+            );
+        }
+
+        // 确认字符串内容没有越过当前数组末尾。
+        EnsureReadableBytes(stringBytesLength);
+
+
         string value = Encoding.UTF8.GetString(allBytes, _bytesReadOrWritePosition, stringBytesLength);
         _bytesReadOrWritePosition += stringBytesLength;
         return value;
@@ -163,6 +179,19 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
     protected TK ReadAllBytesToCustomType<TK>() where TK : CanBeBinarySerialize<TK>, new()
     {
         int fieldBytesLength = ReadAllBytesToIntType();
+
+        if (fieldBytesLength < 0)
+        {
+            throw new InvalidDataException(
+                $"协议读取失败：自定义类型字节长度不能为负数，" +
+                $"length = {fieldBytesLength}"
+            );
+        }
+
+        // 必须先验证，再创建数组。
+        EnsureReadableBytes(fieldBytesLength);
+
+
         byte[] fieldBytes = new byte[fieldBytesLength];
         Array.Copy(allBytes, _bytesReadOrWritePosition, fieldBytes, 0, fieldBytesLength);
         TK fieldValue = new TK();
@@ -185,5 +214,51 @@ public abstract class CanBeBinarySerialize<T> : CanBeBinarySerializeBase where T
     {
         allBytes = bytes;
         _bytesReadOrWritePosition = 0;
+    }
+
+    /// <summary>
+    /// 先检查，后执行~~我接下来要读 count 个字节，当前AllBytes剩余字节够不够？够的话就真的去走赋值和移动指针的逻辑，不够的话，不会去执行赋值和移动指针的逻辑
+    /// </summary>
+    private void EnsureReadableBytes(int count)
+    {
+        // 需要读取的长度本身不能是负数。
+        if (count < 0)
+        {
+            throw new InvalidDataException(
+                $"协议读取失败：读取长度不能为负数，count = {count}"
+            );
+        }
+
+        if (allBytes == null)
+        {
+            throw new InvalidDataException(
+                "协议读取失败：当前字节数组为空。"
+            );
+        }
+
+        // 理论上的状态保护，防止游标已经处于非法位置。
+        if (_bytesReadOrWritePosition < 0 ||
+            _bytesReadOrWritePosition > allBytes.Length)
+        {
+            throw new InvalidDataException(
+                $"协议读取失败：读取位置非法，" +
+                $"position = {_bytesReadOrWritePosition}，" +
+                $"arrayLength = {allBytes.Length}"
+            );
+        }
+
+        int remainingBytes =
+            allBytes.Length - _bytesReadOrWritePosition;
+
+        // 比较剩余长度，而不是计算 position + count，
+        // 避免加法自身发生整数溢出。
+        if (count > remainingBytes)
+        {
+            throw new InvalidDataException(
+                $"协议读取失败：剩余字节不足。" +
+                $"需要读取 {count} 字节，" +
+                $"实际只剩 {remainingBytes} 字节。"
+            );
+        }
     }
 }

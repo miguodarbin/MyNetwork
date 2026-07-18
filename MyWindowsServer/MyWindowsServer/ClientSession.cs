@@ -29,6 +29,12 @@ public class ClientSession
 
     //=========================================接收远程客户端frame=========================================
 
+    //当前TCP外层帧头：消息类型ID 4字节 + PayloadLength 4字节
+    private const int HeaderSize = sizeof(int) * 2;
+
+    //单条消息体允许的最大长度：256kb
+    private const int MaxPayloadLength = 256 * 1024;
+
     //先搞一个水桶，方便去系统那边捞传输过来的字节
     byte[] buffer = new byte[1024 * 1024];
 
@@ -132,24 +138,40 @@ public class ClientSession
         {
             //游标：处理到缓存区的哪里了？
             int cursor = 0;
-            //消息头长度：基本上就是两个int就是8个字节
-            int headCount = 8;
             //缓存区目前里面的长度
             int originalBytesListCount = _originalBytesQueue.Count;
             //如果缓存区的字节长度大于等于消息头的长度,那就说明可以继续解析消息头的具体内容
-            if (originalBytesListCount >= headCount)
+            if (originalBytesListCount >= HeaderSize)
             {
                 //游标 +4，从方法体长度开始读
                 cursor += sizeof(int);
-                int msgBodyCount = BitConverter.ToInt32(_originalBytesQueue.ToArray(), cursor);
+                int payloadLength = BitConverter.ToInt32(_originalBytesQueue.ToArray(), cursor);
+
+                //*************************网络传来的长度属于不可信输入*************************
+                //必须在参与游标计算、数组分配、出队之前验证。有效荷载不能是负数，也不能超过定义的最大消息有效荷载
+                if (payloadLength < 0 || payloadLength > MaxPayloadLength)
+                {
+                    Console.WriteLine(
+                        $"协议长度非法：PayloadLength={payloadLength}，" +
+                        $"允许范围为 0~{MaxPayloadLength}"
+                    );
+
+                    //断开对此端的连接
+                    Close();
+
+                    //边界已经不可信，立即停止本次分帧。
+                    return;
+                }
+                //***************************************************************************
+
                 //游标再 +4，指向消息体
                 cursor += sizeof(int);
                 //拿缓存区的总个数-目前游标位置得到  缓存区剩余的字节数,也就是消息体的字节数
                 int remainBytesCount = originalBytesListCount - cursor;
                 //游标再 +消息体长度，指向下一个消息头部
-                cursor += msgBodyCount;
+                cursor += payloadLength;
                 //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数大于消息体长度，说明粘包了。
-                if (remainBytesCount > msgBodyCount)
+                if (remainBytesCount > payloadLength)
                 {
                     //然后把从0到对象字节长度那么多的字节从缓存区拿走，加入成功区。
                     byte[] msgBytes = new byte[cursor];
@@ -165,7 +187,7 @@ public class ClientSession
                 }
 
                 //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数等于消息体长度，说明没有发生粘包分包。
-                if (remainBytesCount == msgBodyCount)
+                if (remainBytesCount == payloadLength)
                 {
                     //然后把从0到对象字节长度那么多的字节从缓存区拿走，加入成功区。
                     byte[] msgBytes = new byte[cursor];
@@ -181,7 +203,7 @@ public class ClientSession
                 }
 
                 //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数小于消息体长度，说明发生分包了。
-                if (remainBytesCount < msgBodyCount)
+                if (remainBytesCount < payloadLength)
                 {
                     //此时不应该继续处理了，直接打破循环，等之后的再发消息过来，再来判断能不能处理。
                     break;
@@ -309,7 +331,7 @@ public class ClientSession
 
     //保护_connectClientSocket字段的读取和置空操作
     private readonly object _socketLock = new object();
-    
+
     public void Close()
     {
         Socket socket;

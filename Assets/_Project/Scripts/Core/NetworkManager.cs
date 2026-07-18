@@ -77,7 +77,7 @@ public class NetworkManager : MonoBehaviour
         return true;
     }
 
-    //===================================================接收远程服务器frame===================================
+    //===================================================发送frame给远程服务器===================================
 
     //专门开一个自动阻塞线程的队列，记录待发送的。然后有一个专门处理这个队列发送的异步方法作为后台线程，不会阻塞主线程.Unity主线程负责入队，后台线程发送线程负责出队。
     //没有数据时，消费线程会自动等待阻塞后台线程，后台线程不会空转。
@@ -178,14 +178,20 @@ public class NetworkManager : MonoBehaviour
     }
 
 
-    //===================================================发送本地客户端frame===================================
+    //===================================================接受服务器给的frame===================================
 
     //处理完分包粘包的frame说存放的队列：被 ProcessTCPStream 处理完毕成为一个frame之后才往里面放，一个字节数组代表一个完整frame。由外部取消费这个Queue<byte>消息
     //线程是安全的，unity主线程和后台处理接收消息的线程 可以同时操作_processedMsgQueue
-    private readonly ConcurrentQueue<byte[]> _processedMsgQueue = new ConcurrentQueue<byte[]>();
+    private readonly ConcurrentQueue<byte[]> _completeFrameQueue = new ConcurrentQueue<byte[]>();
 
     //不管 37 二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
     private Queue<byte> _originalBytesQueue = new Queue<byte>();
+
+    //当前TCP外层帧头：消息类型ID 4字节 + PayloadLength 4字节
+    private const int HeaderSize = sizeof(int) * 2;
+
+    //单条消息体允许的最大长度：256kb
+    private const int MaxPayloadLength = 256 * 1024;
 
     //声明一个容器，作为专门去操作系统那边的的Socket收消息缓冲区里面捞字节的水桶
     private byte[] originalBytesBucket = new byte[1024 * 1024];
@@ -254,24 +260,42 @@ public class NetworkManager : MonoBehaviour
         {
             //游标：处理到缓存区的哪里了？
             int cursor = 0;
-            //消息头长度：基本上就是两个int就是8个字节
-            int headCount = 8;
             //缓存区目前里面的长度
             int originalBytesListCount = _originalBytesQueue.Count;
             //如果缓存区的字节长度大于等于消息头的长度,那就说明可以继续解析消息头的具体内容
-            if (originalBytesListCount >= headCount)
+            if (originalBytesListCount >= HeaderSize)
             {
                 //游标 +4，从消息体长度开始读
                 cursor += sizeof(int);
-                int msgBodyCount = BitConverter.ToInt32(_originalBytesQueue.ToArray(), cursor);
+                int payloadLength = BitConverter.ToInt32(_originalBytesQueue.ToArray(), cursor);
+
+                //*************************网络传来的长度属于不可信输入*************************
+                //必须在参与游标计算、数组分配、出队之前验证。有效荷载不能是负数，也不能超过定义的最大消息有效荷载
+                if (payloadLength < 0 || payloadLength > MaxPayloadLength)
+                {
+                    Debug.LogError(
+                        $"协议长度非法：PayloadLength={payloadLength}，" +
+                        $"允许范围为 0~{MaxPayloadLength}"
+                    );
+
+                    //断开对此端的连接
+                    CloseConnection();
+
+                    //边界已经不可信，立即停止本次分帧。
+                    return;
+                }
+                //***************************************************************************
+
                 //游标再 +4，指向消息体
                 cursor += sizeof(int);
+                
                 //拿缓存区的总个数-目前游标位置得到  缓存区剩余的字节数,也就是消息体的字节数
                 int remainBytesCount = originalBytesListCount - cursor;
+                
                 //游标再 +消息体长度，指向下一个消息头部
-                cursor += msgBodyCount;
+                cursor += payloadLength;
                 //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数大于消息体长度，说明粘包了。
-                if (remainBytesCount > msgBodyCount)
+                if (remainBytesCount > payloadLength)
                 {
                     //然后把从0到对象字节长度那么多的字节从缓存区拿走，加入成功区。
                     byte[] msgBytes = new byte[cursor];
@@ -280,14 +304,14 @@ public class NetworkManager : MonoBehaviour
                         msgBytes[i] = _originalBytesQueue.Dequeue();
                     }
 
-                    _processedMsgQueue.Enqueue(msgBytes);
+                    _completeFrameQueue.Enqueue(msgBytes);
 
                     //游标置零，让下一次循环时，游标指向消息头。否则游标一直是旧值，而Queue队列不断变化，会无法对齐。不用打破循环，一直走到打破循环的分支上去。
                     cursor = 0;
                 }
 
                 //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数等于消息体长度，说明没有发生粘包分包。
-                if (remainBytesCount == msgBodyCount)
+                if (remainBytesCount == payloadLength)
                 {
                     //然后把从0到对象字节长度那么多的字节从缓存区拿走，加入成功区。
                     byte[] msgBytes = new byte[cursor];
@@ -296,14 +320,14 @@ public class NetworkManager : MonoBehaviour
                         msgBytes[i] = _originalBytesQueue.Dequeue();
                     }
 
-                    _processedMsgQueue.Enqueue(msgBytes);
+                    _completeFrameQueue.Enqueue(msgBytes);
 
                     //打破循环，因为缓存区再拿完这条消息之后就没字节了。
                     break;
                 }
 
                 //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数小于消息体长度，说明发生分包了。
-                if (remainBytesCount < msgBodyCount)
+                if (remainBytesCount < payloadLength)
                 {
                     //此时不应该继续处理了，直接打破循环，等之后的再发消息过来，再来判断能不能处理。
                     break;
@@ -322,12 +346,18 @@ public class NetworkManager : MonoBehaviour
     /// </summary>
     public bool TryDequeueReceivedFrame(out byte[] frameBytes)
     {
-        return _processedMsgQueue.TryDequeue(out frameBytes);
+        return _completeFrameQueue.TryDequeue(out frameBytes);
     }
 
     //关闭对服务器的连接
     public void CloseConnection()
     {
+        //已经关闭过，直接结束
+        if (_clientSocket == null)
+        {
+            return;
+        }
+        
         _needConnectToServer = false;
         _clientSocket.Shutdown(SocketShutdown.Both);
         _clientSocket.Close();
@@ -337,7 +367,7 @@ public class NetworkManager : MonoBehaviour
             _pendingSendFrame.CompleteAdding(); //将容器标记为完成了添加，不再添加新的项了
         }
 
-        _processedMsgQueue.Clear();
+        _completeFrameQueue.Clear();
     }
 
     private void OnDestroy()
