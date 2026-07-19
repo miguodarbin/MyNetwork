@@ -40,6 +40,8 @@ public class TcpServer
         //注意，目前我只学了同步取的方法，所以为了不阻塞这边的线程，所以我新开一个异步方法，也就相当于开了一个专门去接收客户端的线程，去取TCP连接的结果
         //取到结果后，也会为取到结果的通信Socket各自开一个自己接收客户端消息的能力：StartReceiveLoop()
         AutoAcceptSocket();
+        //并且开启心跳检测,5秒检测一次
+        DriveSessionHeartDetection(5000);
     }
 
     //自动去拿操作系统里_listenSocket的TCP连接信息的一个线程
@@ -133,6 +135,25 @@ public class TcpServer
                 session.Close();
             }
         }
+    }
+
+    //由服务端开一个线程，统一处理所有session的心跳检测
+    private async void DriveSessionHeartDetection(int detechFrequency)
+    {
+        await Task.Run(() =>
+        {
+            while (_isEnable)
+            {
+                //获取当前活动会话的独立数组快照,因为可能在广播的过程中，又有新的Client加入字典
+                ClientSession[] sessionSnapshot = _connectClientSocketDict.Values.ToArray();
+                foreach (var session in sessionSnapshot)
+                {
+                    session.ClientHeartDetection();
+                }
+
+                Thread.Sleep(detechFrequency);
+            }
+        });
     }
 
 

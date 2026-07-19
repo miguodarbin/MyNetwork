@@ -27,7 +27,7 @@ public class ClientSession
         _onSessionClosed = onSessionClosed;
     }
 
-    //=========================================接收远程客户端frame=========================================
+    //=========================================接收远程客户端frame到服务器=========================================
 
     //当前TCP外层帧头：消息类型ID 4字节 + PayloadLength 4字节
     private const int HeaderSize = sizeof(int) * 2;
@@ -37,7 +37,6 @@ public class ClientSession
 
     //先搞一个水桶，方便去系统那边捞传输过来的字节
     byte[] buffer = new byte[1024 * 1024];
-
 
     //不管 37二十一，拿到了客户端的字节就往里面放,严禁业务层直接用这里面的数据,逻辑在处理这个的时候严禁改顺序
     private Queue<byte> _originalBytesQueue = new Queue<byte>();
@@ -141,7 +140,7 @@ public class ClientSession
         }
     }
 
-    //这个方法主要是用来处理分包黏包，处理完之后交给ProgressReceivedMsg分析器去分析frame
+    //这个方法主要是用来处理分包黏包，处理完之后交给ProcessReceivedFrame分析器去分析frame
     private void ProcessTCPOriginalBytes()
     {
         //循环判断：缓存区有字节就进入循环，无字节就退出循环。还有靠break打破循环
@@ -237,6 +236,17 @@ public class ClientSession
 
         switch (msgType)
         {
+            case 0:
+                Socket socket;
+                lock (_socketLock)
+                {
+                    socket = _connectClientSocket;
+                }
+
+                ReceiveBeatOnce();
+                Console.WriteLine("【系统】客户端连接超时：" + socket.RemoteEndPoint);
+                break;
+
             case 1000:
             {
                 StringMsg stringMsg = new StringMsg();
@@ -262,7 +272,7 @@ public class ClientSession
     }
 
 
-    //=========================================发送本地服务器frame=========================================
+    //=========================================发送本地服务器的frame去客户端=========================================
     public void SendBytesToClient(byte[] bytes)
     {
         Socket socket;
@@ -333,6 +343,55 @@ public class ClientSession
     public string GetRemoteClientEndPoint()
     {
         return _connectClientSocket.RemoteEndPoint.ToString();
+    }
+
+
+    //=========================================心跳检测相关=========================================
+    //记录最新的那次心跳时间
+    private DateTime NearestBeatTime;
+
+    //定义一个时间长度，超过这个时间长度就认为超时了
+    private TimeSpan TimeOutSpan = new TimeSpan(0, 0, 5);
+
+    private void ReceiveBeatOnce()
+    {
+        NearestBeatTime = DateTime.Now;
+    }
+
+    /// <summary>
+    /// 检测一次心跳是否合规，看看目前时间距离最新的那次心跳时间有没有超过阈值
+    /// </summary>
+    public void ClientHeartDetection()
+    {
+        //先给socket加锁，必须要获得这个socket，别拿一个空的socket做检测
+        Socket socket;
+        lock (_socketLock)
+        {
+            socket = _connectClientSocket;
+        }
+
+        //记录一下当前的检测时间
+        DateTime now = DateTime.Now;
+        //计算一下目前时间距离最新的那次心跳时间的时间长度
+        TimeSpan AfterNearestBeatTimeSpan = now - NearestBeatTime;
+        //判断一下目前时间距离最新的那次心跳时间有没有超过阈值
+        if (AfterNearestBeatTimeSpan > TimeOutSpan) //如果超过阈值了
+        {
+            //断开这个会话
+            Console.WriteLine("【系统】客户端连接超时：" + socket.RemoteEndPoint);
+            try
+            {
+                socket.Close();
+            }
+            catch (SocketException e)
+            {
+                //对方可能已经断开
+            }
+            catch (ObjectDisposedException)
+            {
+                //Socket可能已经被其他路径释放
+            }
+        }
     }
 
 

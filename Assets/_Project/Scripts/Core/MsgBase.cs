@@ -55,11 +55,19 @@ public abstract class MsgBase<T> : CanBeBinarySerialize<T> where T : CanBeBinary
         payloadLength = ReadFrameBytesToIntType();
     }
 
-    protected int GetMsgHeaderCount()
+    protected int GetMsgHeaderCount(bool havePayload = true)
     {
         TrySetMsgTypeID();
-        //第一个int是类型Type的信息，第二个int是消息长度的信息
-        return sizeof(int) + sizeof(int);
+        if (havePayload)
+        {
+            //第一个int是类型Type的信息，第二个int是消息长度的信息
+            return sizeof(int) + sizeof(int);
+        }
+        else
+        {
+            //没有有效荷载的话，就一个Type的信息
+            return sizeof(int);
+        }
     }
 
 

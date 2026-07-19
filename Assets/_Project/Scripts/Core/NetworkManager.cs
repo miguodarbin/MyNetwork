@@ -74,6 +74,8 @@ public class NetworkManager : MonoBehaviour
         ProgressSendFrameAsync();
         //开启Manager的收服务器消息功能
         ProgressReceivedBytesAsync();
+        //并且开启心跳
+        InvokeRepeating(nameof(BeatOnce), 0, 2);
         return true;
     }
 
@@ -288,10 +290,10 @@ public class NetworkManager : MonoBehaviour
 
                 //游标再 +4，指向消息体
                 cursor += sizeof(int);
-                
+
                 //拿缓存区的总个数-目前游标位置得到  缓存区剩余的字节数,也就是消息体的字节数
                 int remainBytesCount = originalBytesListCount - cursor;
-                
+
                 //游标再 +消息体长度，指向下一个消息头部
                 cursor += payloadLength;
                 //与刚才解析出来的消息体长度比较,如果缓存区剩余的字节数大于消息体长度，说明粘包了。
@@ -349,6 +351,15 @@ public class NetworkManager : MonoBehaviour
         return _completeFrameQueue.TryDequeue(out frameBytes);
     }
 
+    //===================================================心跳消息===================================
+    HeartMsg heartMsg = new HeartMsg();
+
+    private void BeatOnce()
+    {
+        SendFrameToServer(heartMsg.SerializeToFrameBytes());
+    }
+    
+    //===================================================关闭相关===================================
     //关闭对服务器的连接
     public void CloseConnection()
     {
@@ -357,7 +368,7 @@ public class NetworkManager : MonoBehaviour
         {
             return;
         }
-        
+
         _needConnectToServer = false;
         _clientSocket.Shutdown(SocketShutdown.Both);
         _clientSocket.Close();

@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "right": {
     "id": "3ba0f36b3b613818",
@@ -170,7 +170,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 380.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -185,16 +185,16 @@
   },
   "active": "33d71711649b79e8",
   "lastOpenFiles": [
-    "obj/Debug/Assembly-CSharp.csproj.FileListAbsolute.txt",
+    "Temp/UnityTempFile-d8447d39ae4b84d4da0a424a005c7ff6",
+    "Library/Search/propertyAliases.db_ae9e733ec0f64f99b8a47df0e3ea2c0e_temp",
+    "Library/ProtocolInstance.json",
+    "Library/Search/propertyDatabase.db_35c0026bc2c74f0db9b5d8943766d8bb_temp",
+    "Temp/UnityTempFile-57cbbae08ef82d74187395b922e77b40",
+    "Library/Bee/TundraBuildState.state",
+    "MyWindowsServer/MyWindowsServer/HeartMsg.cs~",
     "Temp/Bin/Debug/Assembly-CSharp/Assembly-CSharp.pdb",
     "Temp/Bin/Debug/Assembly-CSharp/Assembly-CSharp.dll",
-    "obj/Debug/Assembly.44154EF1.Up2Date",
-    "Temp/Bin/Debug/Assembly-CSharp/UnityEngine.TestRunner.pdb",
-    "Temp/Bin/Debug/Assembly-CSharp/UnityEngine.NVIDIAModule.xml",
-    "Temp/Bin/Debug/Assembly-CSharp/UnityEditor.TestRunner.pdb",
-    "Temp/Bin/Debug/Assembly-CSharp/Unity.VisualScripting.Flow.Editor.pdb",
-    "Temp/Bin/Debug/Assembly-CSharp/Unity.VisualScripting.Flow.pdb",
-    "Temp/Bin/Debug/Assembly-CSharp/Unity.VSCode.Editor.pdb",
-    "Temp/Bin/Debug/Assembly-CSharp/Unity.VisualScripting.State.pdb"
+    "Temp/Bin/Debug/Assembly-CSharp/Unity.VisualScripting.SettingsProvider.Editor.pdb",
+    "Temp/Bin/Debug/Assembly-CSharp/Unity.EditorCoroutines.Editor.pdb"
   ]
 }
