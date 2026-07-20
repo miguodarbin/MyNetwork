@@ -69,7 +69,7 @@ public class TcpServer
                     }
 
                     //接到客户端的连接信息了，那就初始化成session对象，并且把从字典中删除的方法作为回调注册给session，session只要一关闭就从TCPServer这边的字典里移除掉
-                    ClientSession connetClientSocket = new ClientSession(originConnetClientSocket, OnClientSessionClosed);
+                    ClientSession connetClientSocket = new ClientSession(originConnetClientSocket, OnClientSessionClosed, DateTime.Now);
 
                     //系统提示一下，有客户端接入了
                     Console.WriteLine("【系统】" + connetClientSocket.GetRemoteClientEndPoint() + "已接入");

@@ -20,11 +20,12 @@ public class ClientSession
 
     //构造函数，要求TcpServer必须要给到一个原生的 连接客户端 的通信Socket，才能创建我这个封装的 连接客户端的通信Socket
     //并且TcpServer还要能接收当这个客户端对话被关掉之后，客户端对话给到的自己的ID
-    public ClientSession(Socket originConnetClientSocket, Action<int> onSessionClosed)
+    public ClientSession(Socket originConnetClientSocket, Action<int> onSessionClosed, DateTime firstBeat)
     {
         this._connectClientSocket = originConnetClientSocket;
         this.ID = ++IDCreator;
         _onSessionClosed = onSessionClosed;
+        _nearestBeatTime = firstBeat;
     }
 
     //=========================================接收远程客户端frame到服务器=========================================
@@ -244,7 +245,7 @@ public class ClientSession
                 }
 
                 ReceiveBeatOnce();
-                Console.WriteLine("【系统】客户端连接超时：" + socket.RemoteEndPoint);
+                Console.WriteLine("【系统】收到客户端心跳：" + socket.RemoteEndPoint);
                 break;
 
             case 1000:
@@ -348,14 +349,14 @@ public class ClientSession
 
     //=========================================心跳检测相关=========================================
     //记录最新的那次心跳时间
-    private DateTime NearestBeatTime;
+    private DateTime _nearestBeatTime;
 
     //定义一个时间长度，超过这个时间长度就认为超时了
-    private TimeSpan TimeOutSpan = new TimeSpan(0, 0, 5);
+    private TimeSpan _timeOutSpan = new TimeSpan(0, 0, 5);
 
     private void ReceiveBeatOnce()
     {
-        NearestBeatTime = DateTime.Now;
+        _nearestBeatTime = DateTime.Now;
     }
 
     /// <summary>
@@ -373,9 +374,9 @@ public class ClientSession
         //记录一下当前的检测时间
         DateTime now = DateTime.Now;
         //计算一下目前时间距离最新的那次心跳时间的时间长度
-        TimeSpan AfterNearestBeatTimeSpan = now - NearestBeatTime;
+        TimeSpan AfterNearestBeatTimeSpan = now - _nearestBeatTime;
         //判断一下目前时间距离最新的那次心跳时间有没有超过阈值
-        if (AfterNearestBeatTimeSpan > TimeOutSpan) //如果超过阈值了
+        if (AfterNearestBeatTimeSpan > _timeOutSpan) //如果超过阈值了
         {
             //断开这个会话
             Console.WriteLine("【系统】客户端连接超时：" + socket.RemoteEndPoint);

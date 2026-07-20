@@ -5,7 +5,7 @@ public class HeartMsg : MsgBase<HeartMsg>
 {
     public override int GetFrameBytesLength()
     {
-        return GetMsgHeaderCount(false);
+        return GetMsgHeaderCount();
     }
 
     protected override void WriteFrameBytes()
