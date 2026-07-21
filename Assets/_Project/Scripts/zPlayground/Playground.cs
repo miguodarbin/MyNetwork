@@ -1,71 +1,108 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Unity.VisualStudio.Editor;
 using UnityEngine;
 
 
 public class Playground : MonoBehaviour
 {
-    //定义一个可以装1024个字节的水桶数组，去操作系统那边捞接收到的字节
-    public byte[] bucket = new byte[1024];
+    public Transform cube;
 
-    private void Start()
+    private async void Start()
     {
-        //先声明一个客户端Socket，用于程序是用TCP协议进行网络通讯
-        Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        //然后开始异步连接，然后就继续主线程，我需要注册一个连接任务完成后的回调，注意这里调用回调的时候并不代表已经连接上了，只是说连接有结果了，具体是失败还是成功，需要EndConnect的时候才知道
-        clientSocket.BeginConnect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8080), (receipt) =>
-        {
-            Socket clientSocket = receipt.AsyncState as Socket;
-            try
-            {
-                //到这一步才能知道到底连接结果是成功还是失败
-                clientSocket.EndConnect(receipt);
-            }
-            catch (SocketException)
-            {
-            }
-        }, clientSocket);
-
-        //然后开始异步接收消息
-        clientSocket.BeginReceive(bucket, 0, 0, SocketFlags.None, OnReceiveHaveResult, clientSocket);
-
-        //发送一个消息帧
-        byte[] msgFrame = Encoding.UTF8.GetBytes("Hello World!");
-        clientSocket.BeginSend(msgFrame, 0, msgFrame.Length, SocketFlags.None, (receipt) =>
-        {
-            Socket clientSocket = receipt.AsyncState as Socket;
-            try
-            {
-                clientSocket.EndSend(receipt);
-            }
-            catch (SocketException)
-            {
-                //发送的时候，ClientSocket有错误了
-            }
-
-        }, clientSocket);
+        await DoSomething();
+        Debug.Log("DoSomethingDone");
     }
 
-    //当接受消息的操作有了结果
-    private void OnReceiveHaveResult(IAsyncResult receipt)
+    private void Update()
     {
-        Socket clientSocket = receipt.AsyncState as Socket;
-        int receivedBytesCount;
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            //这里不去等待 DownloadAsync()，只要遇到未完成的的Task，比如request.GetResponseAsync。就会返回执行权给到DownloadAsync()，
+            //DownloadAsync()也有await，就会继续等待，并把执行权给到Update()，Update()这里没有await，所以继续执行接下来的代码。
+            //如果Update()这里也有await，那Update这里就被卡住了，但调用Update那边的流程不会卡住
+            _ = DownloadAsync();
+        }
+
+        if (Input.GetKeyDown(KeyCode.L))
+        {
+            //这里不去等待异步操作，遇到暂停，直接继续执行
+            _ = UploadAsync();
+        }
+
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            _taskSource.SetResult(true);
+        }
+
+        cube.transform.Translate(0, 0, 1 * Time.deltaTime);
+    }
+
+    //去异步执行下载文件
+    private async Task DownloadAsync()
+    {
+        bool success;
         try
         {
-            receivedBytesCount = clientSocket.EndReceive(receipt);
+            //遇到暂停，就等着，等到执行完毕拿到结果，判断结果
+            success = await HttpManager.Instance.DownloadFileAsync("http://192.168.0.188/macos_http_server/000.png", "111.png");
         }
-        catch (SocketException)
+        catch (Exception e)
         {
-            //接受的时候，ClientSocket有错误了
+            Debug.Log(e.Message);
             return;
         }
 
-        //处理消息
-        string msg = Encoding.UTF8.GetString(bucket, 0, receivedBytesCount);
-        //然后继续接受消息
-        clientSocket.BeginReceive(bucket, 0, 0, SocketFlags.None, OnReceiveHaveResult, clientSocket);
+        if (success)
+        {
+            Debug.Log("Done");
+        }
+        else
+        {
+            Debug.Log("Failed");
+        }
+    }
+
+    //Task表示的是一个操作，未来的完成状态，看看外部要不要等这个方法有结果咯~
+    private async Task UploadAsync()
+    {
+        bool success;
+        try
+        {
+            //这里遇到未完成的Task需要暂停，并等到Task完成，拿到结果
+            success = await HttpManager.Instance.UploadFileAsync(
+                "http://192.168.0.188/macos_http_server/",
+                Application.streamingAssetsPath + "/qqq.png",
+                "Image",
+                "qqq.png");
+        }
+        catch (Exception e)
+        {
+            Debug.Log(e.Message);
+            return;
+        }
+
+        if (success)
+        {
+            Debug.Log("Done");
+        }
+        else
+        {
+            Debug.Log("Failed");
+        }
+    }
+
+    private TaskCompletionSource<bool> _taskSource;
+
+    private Task DoSomething()
+    {
+        Debug.Log("DoSomething");
+        _taskSource = new TaskCompletionSource<bool>();
+        return _taskSource.Task;
     }
 }
